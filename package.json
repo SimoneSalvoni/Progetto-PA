@@ -13,6 +13,7 @@
     "jsonwebtoken":"^8.5.1",
     "sequelize":"^6.20.1",
     "tesseract.js": "^2.1.5",
-    "mysql2":"^2.3.3"
+    "mysql2":"^2.3.3",
+    "express-fileupload":"^1.4.0"
   }
 }
