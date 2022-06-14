@@ -34,24 +34,24 @@ export function jwtCheck(role) {
 }
 
 /*
-Questa funziona è il middleware che controlla che sia stato passato l'id corrispondente alla tratta o alla postazione,
-a dipendenza della rotta.Nello specifico, controlla che l'id sia stato passato nell'header della richiesta, 
-e quindi controlla se è presente nella lista delle tratte/postazioni, che è passata come parametro.
+Questa funziona è il middleware che controlla che sia stato passato l'id corrispondente alla postazione.
+Controlla che l'id sia stato passato nell'header della richiesta, 
+e quindi controlla se è presente nella lista delle postazioni, che è passata come parametro.
 
-@param exists {Object}  La lista degli indici relativi alla tratta o alla postazione, a dipendenza della rotta chiamata
+@param postazioni {array}  La lista degli indici relativi alla tratta o alla postazione, a dipendenza della rotta chiamata
 */
-//FORSE IN UNA POST NON POSSO PASSARE L'ID NELL'HEADER???? IN CASO SERVE UN MIDDLEWARE SEPARATO
-export function checkID(exists) {
+export function checkPostazione(postazioni) {
     return function (req, res, next) {
         try {
-            if (!req.hasOwnProperty('id')) {
-                let err = new Error("L'id non è stato passato");
-                res.status(422).send({ error: err.message });
+            if (!req.params.hasOwnProperty('postazioni')) {
+                let err = new Error("Id della postazione mancante");
+                res.status(400).send({ error: err.message });
             }
-            if (exists.includes(req.id)) next();
+            let id = req.params.postazioni;
+            if (postazioni.includes(id)) next();
             else {
-                let err = new Error("L'id non esiste");
-                res.status(422).send({ error: err.message });
+                let err = new Error("La postazione fornita non esiste");
+                res.status(404).send({ error: err.message });
             }
         }
         catch (err) {
@@ -61,6 +61,34 @@ export function checkID(exists) {
 }
 
 /*
+Questa funziona è il middleware che controlla che sia stato passato l'id corrispondente alla tratta.
+Controlla che l'id sia stato passato nell'header della richiesta, 
+e quindi controlla se è presente nella lista delle tratte, che è passata come parametro.
+
+@param tratte {array}  La lista degli indici relativi alla tratta o alla postazione, a dipendenza della rotta chiamata
+*/
+export function checkTratta(tratte) {
+    return function (req, res, next) {
+        try {
+            if (!req.params.hasOwnProperty('tratta')) {
+                let err = new Error("Id della tratta mancante");
+                res.status(400).send({ error: err.message });
+            }
+            let id = req.params.tratta;
+            if (tratte.includes(id)) next();
+            else {
+                let err = new Error("La tratta fornita non esiste");
+                res.status(404).send({ error: err.message });
+            }
+        }
+        catch (err) {
+            next(err);
+        }
+    }
+}
+
+
+/*
 Questa funzione è il middleware che controlla la presenza e la forma del timestamp.
 Il timestamp deve essere in formato Unix epoch, ovvero un semplice numero intero non negativo. 
 */
@@ -68,7 +96,7 @@ export function checkTimestamp(req, res, next) {
     try {
         if (!req.hasOwnProperty('timestamp')) {
             let err = new Error("Timestamp non presente");
-            res.status(422).send({ error: err.message });
+            res.status(400).send({ error: err.message });
         }
         let timestamp = req.timestamp;
         if (typeof (timestamp) === "number" && Number.isInteger(timestamp) && timestamp >= 0) next();
@@ -84,13 +112,19 @@ export function checkTimestamp(req, res, next) {
 
 /*
 Questa funzione è il middleware che controlla la presenza e la forma delle date di inizio e fine di un intervallo.
+È possibile non specificare alcuna data, ma se una è presente lo deve essere anche l'altra.
 Queste date devono essere strettamente della forma anno-mese-giorno. Per esempio: 2022-06-13. 
 */
 export function checkDate(req, res, next) {
     try {
-        if (!req.hasOwnProperty('inizio') || !req.hasOwnProperty('fine')) {
-            let err = new Error("Almeno una delle date risulta assenti");
-            res.status(422).send({ error: err.message });
+        if ((!req.hasOwnProperty('inizio') && req.hasOwnProperty('fine')) || (req.hasOwnProperty('inizio') && !req.hasOwnProperty('fine'))) {
+            let err = new Error("Una delle due date risulta assente");
+            res.status(400).send({ error: err.message });
+        }
+        if (!req.hasOwnProperty('inizio') && !req.hasOwnProperty('fine')){
+            req.timestampInizio=-1;
+            req.timestampFine=-1;
+            next();
         }
         const dataInizio = req.inizio;
         const dataFine = req.fine;
@@ -113,7 +147,7 @@ export function checkDate(req, res, next) {
 Questa funzione è il middleware che controlla la presenza di un'immagine contenente la targa nella richiesta POST eseguita da un 
 rilevatore. I formati ammessi sono jpg e png.
 */
-export function checkImage(req, res, next) {
+export function checkImmagine(req, res, next) {
     try {
         if (!req.files || Object.keys(req.files).length === 0) {
             let err = new Error("Nessun file presente");
@@ -123,13 +157,10 @@ export function checkImage(req, res, next) {
             let err = new Error("Solo un file è ammesso");
             res.status(422).send({ error: err.message });
         }
-        if (req.files.file.mimetype === 'image/jpeg' || req.files.file.mimetype === 'image/png') {
-            req.fileType = 'image';
-            next();
-        }
+        if (req.files.file.mimetype === 'image/jpeg' || req.files.file.mimetype === 'image/png') next();
         else {
             let err = new Error("Solamente file jpg e png sono ammessi");
-            res.status(422).send({ error: err.message });
+            res.status(415).send({ error: err.message });
         }
     }
     catch (err) {
@@ -151,14 +182,11 @@ export function checkJson(req, res, next) {
             let err = new Error("Solo un file è ammesso");
             res.status(422).send({ error: err.message });
         }
-        if (req.files.file.mimetype === 'application/json') {
-            req.fileType = 'json';
-            next();
-        }
-        else {
+        if (req.files.file.mimetype !== 'application/json') {
             let err = new Error("Solamente file json sono ammessi");
-            res.status(422).send({ error: err.message });
+            res.status(415).send({ error: err.message });
         }
+        next();
     }
     catch (err) {
         next(err);
@@ -166,13 +194,12 @@ export function checkJson(req, res, next) {
 }
 
 /*
-Questa funzione è il middleware che controlla la presenza e il formato delle targhe passate come 
-argomento alle rotte che le richiedono.
+Questa funzione è il middleware che controlla la presenza e il formato delle targhe all'interno del jwt
 */
 export function checkTarghe(req, res, next) {
-    if (!req.hasOwnProperty('targhe')) {
+    if (!req.token.hasOwnProperty('targhe')) {
         let err = new Error("Targhe non presenti");
-        res.status(422).send({ error: err.message });
+        res.status(400).send({ error: err.message });
     }
     let targhe = req.token.targhe;
     flag = false;
@@ -183,13 +210,28 @@ export function checkTarghe(req, res, next) {
         let err = new Error("Una o più targhe invalide")
         res.status(422).send({ error: err.message });
     }
+    else{
+        req.targhe=targhe;
+        next();
+    }
 }
 
-/* QUA NON CI STA VERO?
-export function checkFine(owner){
-
-}
+/*
+Questa funzione è il middleware che controlla la presenza e il formato della targa passata dall'utente admin 
+quando ricerca le multe relative ad una targa
 */
+export function checkTarga(req, res, next) {
+    if (!req.params.hasOwnProperty('targa')) {
+        let err = new Error("Targa non presente");
+        res.status(400).send({ error: err.message });
+    }
+    let targa = req.params.targa;
+    if (typeof (targa) !== "string" || targa === '' || !targa.test("^[A-Z0-9]{7}$")) {
+        let err = new Error("Targa invalida")
+        res.status(422).send({ error: err.message });
+    }
+    else next();
+}
 
 /*
 Questo middleware parte nel caso in cui i precedenti trovino una situazione di errore, al di fuori dell'errore relativo al jwt,
