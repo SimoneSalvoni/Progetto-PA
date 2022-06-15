@@ -2,13 +2,13 @@ const Postazione = require('../models/postazione.js');
 
 var postazioneDao = {
     findById: findById,
-    findAll: findAll
+    getPostazioni: getPostazioni
 }
 
-function findById(id) {
+export function findById(id) {
     return Postazione.findByPk(id);
 }
 
-function findAll() {
+export function getPostazioni() {
     return Tratta.findAll();
 }

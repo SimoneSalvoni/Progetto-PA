@@ -1,47 +1,67 @@
 const Transito = require('../models/transito.js');
 
 var transitoDao = {
-  findByTratta: findByTratta,
-  createTransito: createTransito,
-  findBetweenDatesTratta: findBetweenDatesTratta,
-  findByTargaTratta: findByTargaTratta,
+  getTransitiTratta: getTransitiTratta,
+  aggiungiTransito: aggiungiTransito,
+  ricercaTransitoAperto: ricercaTransitoAperto,
+  getTransitiTrattaData: getTransitiTrattaData,
+  getTransitiTarga: getTransitiTarga,
   findById: findById,
   deleteById: deleteById,
-  updateTransito: updateTransito
+  chiudiTransito: chiudiTransito,
+  eliminaTransitiErrati: eliminaTransitiErrati
 }
 
-function createTransito(transito) {
-  var newGig = new Gig(gig);
-  return newGig.save();
+export function aggiungiTransito(transito) {
+  var newTransito = new Transito(transito);
+  return newTransito.save();
 }
 
-function findById(id) {
+export function findById(id) {
   return Transito.findByPk(id);
 }
 
+export function ricercaTransitoAperto(targa, tratta) {
+  return Transito.findOne({where : {targa:targa, tratta: tratta, aperto:true }});
+}
 
-function findBetweenDatesTratta(id, startDate, endDate) {
+export function getTransitiTratta(id) {
 
   return Transito.findAll({
     where:
     {
-      tempofin: $between[startDate, endDate]
+      tratta:id
     }
   });
 }
 
-function findByTargaTratta(tratta, targa) {
+export function getTransitiTrattaData(id, startDate, endDate) {
+
+  return Transito.findAll({
+    where:
+    {
+      tempofin: $between[startDate, endDate],
+      tratta:id
+    }
+  });
+}
+
+export function getTransitiTarga(tratta, targa) {
 
   return Transito.findAll({
     where: { tratta: tratta, targa: targa }
   });
 }
 
-function deleteById(id) {
+export function deleteById(id) {
   return Transito.destroy({ where: { idtransito: id } });
 }
 
-function updateTransito(id, tempo) {
+export function eliminaTransitiErrati(date) {
+  return Transito.destroy({ where: { tempoiniz: lt [date - 7200000 ], aperto: True} });
+}
+
+export function chiudiTransito(id, tempo) {
   Transito.findByPk(id)
     .on('success', function (transito) {
       // Check if record exists in db

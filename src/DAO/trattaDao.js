@@ -2,13 +2,13 @@ const Tratta = require('../models/tratta.js');
 
 var trattaDao = {
     findById: findById,
-    findAll: findAll
+    getTratte: getTratte
 }
 
-function findAll() {
+export function getTratte() {
     return Tratta.findAll();
 }
 
-function findById(id) {
+export function findById(id) {
     return Tratta.findByPk(id);
 }

@@ -226,7 +226,7 @@ app.get('/listaveicoli/:tratta', (req, res) => {
         })
         */
         if (timestampInizio === -1) TransitoDao.getTransitiTratta(tratta).then(callback);
-        else TransitoDao.getTarnsitiTrattaData(tratta, timestampInizio, timestampFine).then(callback);
+        else TransitoDao.getTransitiTrattaData(tratta, timestampInizio, timestampFine).then(callback);
     }
     catch (err) {
         res.status(500).send({ "error": "Errore interno del server" });

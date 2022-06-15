@@ -1,31 +1,31 @@
 const Multa = require('../models/multa.js');
 
 var multaDao = {
-    findAllUnpaid: findAllUnpaid,
-    createMulta: createMulta,
+    getMulteDaPagare: getMulteDaPagare,
+    creazioneMulta: creazioneMulta,
     findById: findById,
-    findByPlate: findByPlate,
-    payFine: payFine
+    getMulte: getMulte,
+    pagaMulta: pagaMulta
 }
 
-function createMulta(multa) {
+export function creazioneMulta(multa) {
     var newMulta = new Multa(multa);
     return newMulta.save();
 }
 
-function findAllUnpaid() {
+export function getMulteDaPagare() {
     return Multa.findAll({where: {pagato: False}});
 }
 
-function findById(id) {
+export function findById(id) {
     return Multa.findByPk(id);
 }
 
-function findByPlate(targa) {
+export function getMulte(targa) {
     return Multa.findAll({where: {targa: targa}});
 }
 
-function payFine(id) {
+export function pagaMulta(id) {
     Multa.findByPk(id)
   .on('success', function (multa) {
     // Check if record exists in db
