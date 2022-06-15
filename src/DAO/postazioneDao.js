@@ -5,10 +5,12 @@ var postazioneDao = {
     getPostazioni: getPostazioni
 }
 
+//si ricerca una specifica postazione a partire dal suo id
 export function findById(id) {
     return Postazione.findByPk(id);
 }
 
+//vengono restituite tutte le postazioni presenti sul db
 export function getPostazioni() {
     return Tratta.findAll();
 }
