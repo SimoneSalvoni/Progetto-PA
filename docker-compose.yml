@@ -1,0 +1,21 @@
+version: '1.0'
+services:
+    mysqldb:
+        image: mysql
+        restart: always
+        environment:
+          - MYSQL_ROOT_PASSWORD=$(PASSWORD)
+          - MYSQL_DATABASE=${DATABASE}
+          - MYSQL_ALLOW_EMPTY_PASSWORD=yes
+        ports:
+          - ${MYSQL_PORT}:${EXTERNAL_DB_PORT}
+        volumes: 
+          - ./sql/DB.sql:/docker-entrypoint-initdb.d/DB.sql          
+    web-node:
+        build: .
+        ports:
+          - ${PORT}:${EXTERNAL_PORT}
+        depends_on:
+          - mysqldb
+        volumes:
+          - ./${pwd}

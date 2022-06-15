@@ -1,21 +1,28 @@
 const express = require("express");
 const fileUpload = require("express-fileupload");
+import db from './Connection/connect.js'
 import { unlink, createWriteStream } from 'fs'
 import Tesseract from 'tesseract.js';
 import Multa from './Models/multa.js';
-import Postazione from './Models/postazione.js';
 import Transito from './Models/transito.js';
-import Tratta from './Models/tratta.js';
 import MultaDao from './DAO/multaDao.js';
 import PostazioneDao from './DAO/postazioneDao.js';
 import TransitoDao from './DAO/transitoDao.js';
 import TrattaDao from './DAO/trattaDao.js';
-import { jwtCheck, checkPostazione, checkTratta, checkDate, checkImmagine, checkJson, checkTarga, checkTarghe, checkTimestamp , errorHandler} from './Middleware/middleware.js';
+import { jwtCheck, checkPostazione, checkTratta, checkDate, checkImmagine, checkJson, checkTarga, checkTarghe, checkTimestamp, errorHandler } from './Middleware/middleware.js';
+
+
+db.authenticate().then(() => {
+    console.log('Connesso al database');
+}).catch(err => {
+    console.log('Errore: ' + err);
+})
 
 let app = express();
 app.use(fileUpload());
 
 const PORT = process.env.PORT || 3000;
+const HOST = process.hasUncaughtExceptionCaptureCallback.HOST || localhost;
 
 let listaPost = PostazioneDao.getPostazioni();
 let listaPostId = listaPost.map(x => x.id);
@@ -153,7 +160,7 @@ app.post('/nuovarilevazione/json/:postazione', (req, res) => {
     });
     try {
         let jsonFile = require(filePath);
-        if (!jsonFile.targa) res.status(400).send({'errore':'Targa mancante nel file JSON'});
+        if (!jsonFile.targa) res.status(400).send({ 'errore': 'Targa mancante nel file JSON' });
         //SERVE AWAIT???
         processaRilevazione(jsonFile.targa, req);
     }
@@ -286,7 +293,7 @@ relative ad una particolare targa.
 app.get("/multa/:targa", (req, res) => {
     let targa = req.params.targa;
     try {
-        MultaDao.getMulte([targa]).then(({ data: { listaMulte } }) => {
+        MultaDao.getMulte(targa).then(({ data: { listaMulte } }) => {
             let response = { targa: targa, multe: listaMulte };
             res.send(response);
         })
@@ -318,10 +325,14 @@ Questa funzione definisce la rotta /propriemulte, con cui un utente car-owner pu
 //MODIFICA PER AVERE SOLO UNA TARGA COME ARGOMENTO DI GETMULTE
 app.get('/propriemulte', (req, res) => {
     try {
-        MultaDao.getMulte(req.targhe).then(({ data: { listaMulte } }) => {
-            let response = { multe: listaMulte };
-            res.send(response);
-        })
+        let listaMulte;
+        for (let targa in req.targhe) {
+            //AWAIT VA BENE?????
+            let listaMulteParziale = await MultaDao.getMulte(targa);
+            listaMulte = listaMulte.concat(listaMulteParziale);
+        }
+        let response = { multe: listaMulte };
+        res.send(response);
     } catch (error) {
         res.status(500).send({ "error": "Errore interno del server" });
     }
@@ -330,12 +341,12 @@ app.get('/propriemulte', (req, res) => {
 /*
 Questa funzione definisce la rotta /paga/:id_multa, con cui un utente car-owner può pagare una propria multa.
 */
-app.patch("/pagamento/:id_multa", (req, res) => {
-    if (!req.params.hasOwnProperty('id_multa')) {
+app.patch("/pagamento/:idMulta", (req, res) => {
+    if (!req.params.hasOwnProperty('idMulta')) {
         let err = new Error("Id della multa mancante");
         res.status(400).send({ error: err.message });
     }
-    let idMulta = req.params.id_multa;
+    let idMulta = req.params.idMulta;
     try {
         MultaDao.getMulta(idMulta).then(({ data: { multa } }) => {
             let targheUtente = req.targhe;
@@ -362,9 +373,9 @@ app.use('multa/:targa', jwtCheck("admin"), checkTarga, errorHandler);
 app.use('/propriemulte', jwtCheck("car-owner"), checkTarghe, errorHandler);
 app.use('/pagamento/:id_multa', jwtCheck("car-owner"), checkTarghe, errorHandler)
 
-app.listen(PORT, err => {
-    if (err) return console.log(`Impossibile ascoltare nella porta: ${PORT}`);
-    console.log(`server in ascolto su: http://localhost:${PORT}/`);
+app.listen(PORT, HOST, err => {
+    if (err) return console.log(`Impossibile ascoltare sull host ${HOST} nella porta: ${PORT}`);
+    console.log(`server in ascolto su: http://${HOST}:${PORT}/`);
 });
 
 

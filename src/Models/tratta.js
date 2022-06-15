@@ -1,13 +1,8 @@
-const { Sequelize } = require('sequelize');
+import db from './Connection/connect.js'
 
-const sequelize = new Sequelize('database', 'username', 'password', {
-  host: 'localhost',
-  dialect: 'mysql'
+
+export const Tratta = db.define('tratte', {
+	idtratta: Sequelize.INTEGER,
+	limite: Sequelize.INTEGER,
+	distanza: Sequelize.FLOAT
 });
-
-
-const Tratta = sequelize.define('tratte', { 
-	idtratta: Sequelize.INTEGER, 
-	limite: Sequelize.INTEGER, 
-	distanza: Sequelize.FLOAT 
-	});

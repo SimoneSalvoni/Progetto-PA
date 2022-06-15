@@ -1,17 +1,12 @@
 const { Sequelize } = require('sequelize');
+import db from './Connection/connect.js'
 
-const sequelize = new Sequelize('database', 'username', 'password', {
-  host: 'localhost',
-  dialect: 'mysql'
-});
-
-
-const Transito = sequelize.define('postazioni', { 
-	idtransito: Sequelize.INTEGER, 
+export const Transito = db.define('postazioni', {
+	idtransito: Sequelize.INTEGER,
 	tratta: Sequelize.INTEGER,
 	apertura: Sequelize.BOOLEAN,
 	targa: Sequelize.STRING(7),
 	tempoiniz: Sequelize.STRING(20),
 	tempofin: Sequelize.STRING(20),
-	vmedia: Sequelize.FLOAT 
-	});
+	vmedia: Sequelize.FLOAT
+});
