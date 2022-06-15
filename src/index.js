@@ -1,6 +1,6 @@
 const express = require("express");
 const fileUpload = require("express-fileupload");
-import { unlink, createWriteStream, } from 'fs'
+import { unlink, createWriteStream } from 'fs'
 import Tesseract from 'tesseract.js';
 import Multa from './Models/multa.js';
 import Postazione from './Models/postazione.js';
@@ -13,7 +13,7 @@ import TrattaDao from './DAO/trattaDao.js';
 import { jwtCheck, checkPostazione, checkTratta, checkDate, checkImmagine, checkJson, checkTarga, checkTarghe, checkTimestamp } from './Middleware/middleware.js';
 
 let app = express();
-app.use(fileUpload())
+app.use(fileUpload());
 
 const port = process.env.PORT || 3000;
 
@@ -108,7 +108,6 @@ let processaRilevazione = function (targa, req) {
 Questa funzione definisce la rotta /nuovarilevazione/:postazione che permette ad un utente smartautovelox di spedire una nuova 
 rilevazione di passaggio di un'automobile. In questo caso l'autovelox spedisce un'immagine della targa
 */
-//ANDRA' FATTO UN MODO PER CHIUDERE I TRANSITI APERTI DA TROPPO TEMPO
 app.post('/nuovarilevazione/:postazione', (req, res) => {
     let file = req.files.file;
     let filePath = __dirname + '/tmp/' + file.name;
@@ -134,7 +133,7 @@ app.post('/nuovarilevazione/:postazione', (req, res) => {
         */
         //prima però provo async
         try {
-            await unlink(filePath);
+            unlink(filePath);
         } catch (error) {
             console.error('there was an error while deleting the file:', error.message);
         }
@@ -153,7 +152,7 @@ app.post('/nuovarilevazione/json/:postazione', (req, res) => {
         if (err) res.status(500).send({ "errore": "Errore interno del server" });
     });
     try {
-        let jsonFile = require(filePath)
+        let jsonFile = require(filePath);
         if (!jsonFile.targa) res.status(400).send({'errore':'Targa mancante nel file JSON'});
         //SERVE AWAIT???
         processaRilevazione(jsonFile.targa, req);
@@ -170,7 +169,7 @@ app.post('/nuovarilevazione/json/:postazione', (req, res) => {
         */
         //prima però provo async
         try {
-            await unlink(filePath);
+            unlink(filePath);
         } catch (error) {
             console.error('there was an error while deleting the file:', error.message);
         }
@@ -316,6 +315,7 @@ app.get('/multeaperte', (req, res) => {
 /*
 Questa funzione definisce la rotta /propriemulte, con cui un utente car-owner può controllare le proprie multe
 */
+//MODIFICA PER AVERE SOLO UNA TARGA COME ARGOMENTO DI GETMULTE
 app.get('/propriemulte', (req, res) => {
     try {
         MultaDao.getMulte(req.targhe).then(({ data: { listaMulte } }) => {
@@ -337,14 +337,14 @@ app.patch("/pagamento/:id_multa", (req, res) => {
     }
     let idMulta = req.params.id_multa;
     try {
-        MultaDao.getMulta(id_multa).then(({ data: { multa } }) => {
+        MultaDao.getMulta(idMulta).then(({ data: { multa } }) => {
             let targheUtente = req.targhe;
             let targaMulta = multa.targa;
             if (!targheUtente.includes(targaMulta))
                 res.status(403).send({ "error": "La multa relativa all'id fornito non appartiene a nessuna delle targhe dell'utente." });
             else if (multa.pagato)
                 res.status(403).send({ "error": "La multa relativa all'id fornito è già stata pagata." });
-            else MultaDao.pagaMulta(idMulta).then(() => res.send("Pagamento eseguito"))
+            else MultaDao.pagaMulta(idMulta).then(() => res.send("Pagamento eseguito"));
         })
     } catch (error) {
         res.status(500).send({ "error": "Errore interno del server" });
