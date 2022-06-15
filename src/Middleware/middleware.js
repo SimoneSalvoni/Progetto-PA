@@ -121,9 +121,9 @@ export function checkDate(req, res, next) {
             let err = new Error("Una delle due date risulta assente");
             res.status(400).send({ error: err.message });
         }
-        if (!req.hasOwnProperty('inizio') && !req.hasOwnProperty('fine')){
-            req.timestampInizio=-1;
-            req.timestampFine=-1;
+        if (!req.hasOwnProperty('inizio') && !req.hasOwnProperty('fine')) {
+            req.timestampInizio = -1;
+            req.timestampFine = -1;
             next();
         }
         const dataInizio = req.inizio;
@@ -132,8 +132,14 @@ export function checkDate(req, res, next) {
             let err = new Error("Almeno una delle date risulta mal formattata");
             res.status(422).send({ error: err.message });
         }
-        const dataInizioTimestamp = (new Date(dataInizioStringa)).getTime();
-        const dataFineTimestamp = (new Date(dataFineStringa)).getTime();
+        const dataInizioObject = new Date(dataInizio);
+        const dataFineObject = new Date(dataFine);
+        if (dataInizioObject.toString() === 'Invalid Date' || dataFineObject.toString() === 'Invalid Date') {
+            let err = new Error("Almeno una delle date risulta mal formattata");
+            res.status(422).send({ error: err.message });
+        }
+        const dataInizioTimestamp = dataInizioObject.getTime();
+        const dataFineTimestamp = dataFineObject.getTime();
         req.timestampInizio = dataInizioTimestamp;
         req.timestampFine = dataFineTimestamp;
         next();
@@ -202,7 +208,7 @@ export function checkTarghe(req, res, next) {
         res.status(400).send({ error: err.message });
     }
     let targhe = req.token.targhe;
-    flag = false;
+    let flag = false;
     for (let targa in targhe) {
         if (typeof (targa) !== "string" || targa === '' || !targa.test("^[A-Z0-9]{7}$")) flag = true;
     }
@@ -210,8 +216,8 @@ export function checkTarghe(req, res, next) {
         let err = new Error("Una o più targhe invalide")
         res.status(422).send({ error: err.message });
     }
-    else{
-        req.targhe=targhe;
+    else {
+        req.targhe = targhe;
         next();
     }
 }
@@ -234,9 +240,8 @@ export function checkTarga(req, res, next) {
 }
 
 /*
-Questo middleware parte nel caso in cui i precedenti trovino una situazione di errore, al di fuori dell'errore relativo al jwt,
-che richiede uno status di errore diverso ed è gestito nel relativo middleware. Viene fornito a chi ha chiamato la rotta
-erronamente una risposta, con un HTTP status 500 e un messaggio d'errore.
+Questo middleware parte nel caso in cui i precedenti trovino una situazione di errore generica.
+Viene fornito a chi ha chiamato la rotta erronamente una risposta con un HTTP status 500 e un messaggio d'errore.
 */
 export function errorHandler(err, req, res, next) {
     res.status(500).send({ error: err.message });

@@ -10,12 +10,12 @@ import MultaDao from './DAO/multaDao.js';
 import PostazioneDao from './DAO/postazioneDao.js';
 import TransitoDao from './DAO/transitoDao.js';
 import TrattaDao from './DAO/trattaDao.js';
-import { jwtCheck, checkPostazione, checkTratta, checkDate, checkImmagine, checkJson, checkTarga, checkTarghe, checkTimestamp } from './Middleware/middleware.js';
+import { jwtCheck, checkPostazione, checkTratta, checkDate, checkImmagine, checkJson, checkTarga, checkTarghe, checkTimestamp , errorHandler} from './Middleware/middleware.js';
 
 let app = express();
 app.use(fileUpload());
 
-const port = process.env.PORT || 3000;
+const PORT = process.env.PORT || 3000;
 
 let listaPost = PostazioneDao.getPostazioni();
 let listaPostId = listaPost.map(x => x.id);
@@ -353,20 +353,24 @@ app.patch("/pagamento/:id_multa", (req, res) => {
 
 
 //Qua vengono definiti i middleware da applicare alle varie rotte.
-app.use('/nuovarilevazione/:postazione', jwtCheck('smartautovelox'), checkPostazione(listaPostId), checkTimestamp, checkImmagine);
-app.use('/nuovarilevazione/json/:postazione', jwtCheck('smartautovelox'), checkPostazione(listaPostId), checkTimestamp, checkJson);
-app.use('listaveicoli/:tratta', jwtCheck("admin"), checkTratta(listaTratteId), checkDate);
-app.use('/stat/:targa/:tratta', jwtCheck("admin"), checkTratta(listaTratteId), checkTarga);
-app.use('/tratte', jwtCheck("admin"));
-app.use('multa/:targa', jwtCheck("admin"), checkTarga);
-app.use('/propriemulte', jwtCheck("car-owner", checkTarghe));
-app.use('/pagamento/:id_multa', jwtCheck("car-owner", checkTarghe))
+app.use('/nuovarilevazione/:postazione', jwtCheck('smartautovelox'), checkPostazione(listaPostId), checkTimestamp, checkImmagine, errorHandler);
+app.use('/nuovarilevazione/json/:postazione', jwtCheck('smartautovelox'), checkPostazione(listaPostId), checkTimestamp, checkJson, errorHandler);
+app.use('listaveicoli/:tratta', jwtCheck("admin"), checkTratta(listaTratteId), checkDate, errorHandler);
+app.use('/stat/:targa/:tratta', jwtCheck("admin"), checkTratta(listaTratteId), checkTarga, errorHandler);
+app.use('/tratte', jwtCheck("admin"), errorHandler);
+app.use('multa/:targa', jwtCheck("admin"), checkTarga, errorHandler);
+app.use('/propriemulte', jwtCheck("car-owner"), checkTarghe, errorHandler);
+app.use('/pagamento/:id_multa', jwtCheck("car-owner"), checkTarghe, errorHandler)
 
-app.listen(port);
+app.listen(PORT, err => {
+    if (err) return console.log(`Impossibile ascoltare nella porta: ${PORT}`);
+    console.log(`server in ascolto su: http://localhost:${PORT}/`);
+});
+
 
 /*È possibile che venga rilevato il passaggio di un veicolo all'ingresso di una tratta ma non della fine. Per evitare di mantenere 
 transiti aperti per troppo tempo, si definisce un operazione che viene ripetuta ciclamente di pulizia del DB.
 */
 setInterval(() => {
-    TransitoDao.eliminaTransitiErrati();
+    TransitoDao.eliminaTransitiErrati(Date.getTime());
 }, 1000000000);

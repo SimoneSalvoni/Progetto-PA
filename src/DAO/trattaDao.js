@@ -1,4 +1,4 @@
-const Tratta = require('../models/Tratta');
+const Tratta = require('../models/tratta.js');
 
 var trattaDao = {
     findById: findById,

@@ -1,4 +1,4 @@
-const Multa = require('../models/Multa');
+const Multa = require('../models/multa.js');
 
 var multaDao = {
     findAllUnpaid: findAllUnpaid,

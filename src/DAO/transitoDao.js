@@ -1,4 +1,4 @@
-const Transito = require('../models/Transito');
+const Transito = require('../models/transito.js');
 
 var transitoDao = {
   findByTratta: findByTratta,

@@ -1,4 +1,4 @@
-const Postazione = require('../models/Postazione');
+const Postazione = require('../models/postazione.js');
 
 var postazioneDao = {
     findById: findById,
