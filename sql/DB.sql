@@ -14,9 +14,9 @@ idTratta INTEGER REFERENCES Tratta (idTratta)
 CREATE TABLE Transito (
 idTransito INTEGER AUTO_INCREMENT PRIMARY KEY,
 apertura BOOLEAN,
-tempoIniziale VARCHAR(20),
-tempoFinale VARCHAR(20),
-velocitaMedia NUMERIC(6 , 2 ),
+timestampInizio VARCHAR(20),
+timestampFine VARCHAR(20),
+velMedia NUMERIC(6 , 2 ),
 targa VARCHAR(7),
 tratta INTEGER REFERENCES Tratta (idTratta)
 );

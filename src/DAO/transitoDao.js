@@ -12,9 +12,9 @@ export var TransitoDao = {
   eliminaTransitiErrati: eliminaTransitiErrati
 }
 //si aggiunge una tupla alla tabella transito su db
-function aggiungiTransito(transito) {
-  var newTransito = new Transito(transito);
-  return newTransito.save();
+function aggiungiTransito(targa, tratta, timestampInizio) {
+  var newTransito = await Transito.create({tratta: tratta, apertura: true, targa: targa, timestampInizio: timestampInizio});
+  return newTransito; //potenzialmente rimovibile
 }
 
 //viene restituito uno specifico Transito a partire dal suo id
@@ -61,7 +61,7 @@ function getTransitiTarga(tratta, targa) {
 
 //viene eliminato un transito a partire dal suo id
 function deleteById(id) {
-  return Transito.destroy({ where: { idtransito: id } });
+  return Transito.destroy({ where: { idTransito: id } });
 }
 
 //vengono eliminati tutti i transiti aperti più vecchi di 2 ore
@@ -71,7 +71,7 @@ function eliminaTransitiErrati(date) {
 
 
 //viene modificato il campo "aperto" e il campo "tempofin" di uno specifico transito a partire dal suo id
-function chiudiTransito(id, tempo) {
+function chiudiTransito(id, vel, tempo) {
 
   Transito.findByPk(id)
     .on('success', function (transito) {
@@ -79,7 +79,8 @@ function chiudiTransito(id, tempo) {
       if (transito) {
         transito.update({
           aperto: False,
-          tempofin: tempo
+          velMedia: vel,
+          timestampFine: tempo
         })
           .success(function () { })
       }

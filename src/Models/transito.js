@@ -2,7 +2,7 @@ import Sequelize from 'sequelize';
 import {db} from '../Connection/connect.js'
 
 export const Transito = db.define('postazioni', {
-	idtransito: {
+	idTransito: {
 		type: Sequelize.INTEGER,
 		primaryKey: true,
 		autoIncrement: true
@@ -10,9 +10,9 @@ export const Transito = db.define('postazioni', {
 	tratta: Sequelize.INTEGER,
 	apertura: Sequelize.BOOLEAN,
 	targa: Sequelize.STRING(7),
-	tempoiniz: Sequelize.STRING(20),
-	tempofin: Sequelize.STRING(20),
-	vmedia: Sequelize.FLOAT
+	timestampInizio: Sequelize.STRING(20),
+	timestampFine: Sequelize.STRING(20),
+	velMedia: Sequelize.FLOAT
 },
 	{
 		initialAutoIncrement: 1,

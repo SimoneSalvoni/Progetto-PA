@@ -3,7 +3,7 @@ import {db} from '../Connection/connect.js'
 
 
 export const Tratta = db.define('tratte', {
-	idtratta: {
+	idTratta: {
 		type: Sequelize.INTEGER,
 		primaryKey: true,
 		autoIncrement: true
