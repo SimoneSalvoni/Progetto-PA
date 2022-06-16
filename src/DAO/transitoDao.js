@@ -66,7 +66,7 @@ function deleteById(id) {
 
 //vengono eliminati tutti i transiti aperti più vecchi di 2 ore
 function eliminaTransitiErrati(date) {
-  return Transito.destroy({ where: { tempoiniz: lt[date - 7200000], aperto: True } });
+  return Transito.destroy({ where: { tempoiniz: lt[date - 7200000], aperto: true } });
 }
 
 
@@ -78,7 +78,7 @@ function chiudiTransito(id, vel, tempo) {
       // Check if record exists in db
       if (transito) {
         transito.update({
-          aperto: False,
+          aperto: false,
           velMedia: vel,
           timestampFine: tempo
         })
