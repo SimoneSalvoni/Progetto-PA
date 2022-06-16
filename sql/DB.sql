@@ -1,40 +1,30 @@
 ﻿CREATE DATABASE Rilevazioni;
-\c Rilevazioni
-CREATE TABLE IF NOT EXISTS Tratta (
-IdTratta INTEGER AUTO_INCREMENT=1 PRIMARY KEY,
-Limite INTEGER,
-        Distanza NUMERIC(6, 2 )
-       );
-
-
-CREATE TABLE IF NOT EXISTS Postazione (
-IdPostazione INTEGER AUTO_INCREMENT=1 PRIMARY KEY,
-Tipo VARCHAR(6),
-        IdTratta INTEGER REFERENCES Tratta (IdTratta)
-       );
-
-
-CREATE TABLE IF NOT EXISTS Transito (
-IdTransito INTEGER AUTO_INCREMENT=1 PRIMARY KEY,
+USE Rilevazioni;
+CREATE TABLE Tratta (
+IdTratta INTEGER AUTO_INCREMENT PRIMARY KEY, 
+Limite INTEGER, 
+Distanza NUMERIC(6, 2 )
+);
+CREATE TABLE Postazione (
+IdPostazione INTEGER AUTO_INCREMENT PRIMARY KEY, 
+Tipo VARCHAR(6), 
+IdTratta INTEGER REFERENCES Tratta (IdTratta)
+);
+CREATE TABLE Transito (
+IdTransito INTEGER AUTO_INCREMENT PRIMARY KEY,
 Apertura BOOLEAN,
 TempoIniziale VARCHAR(20),
 TempoFinale VARCHAR(20),
-        VelocitaMedia NUMERIC(6 , 2 ),
+VelocitaMedia NUMERIC(6 , 2 ),
 Targa VARCHAR(7),
 Tratta INTEGER REFERENCES Tratta (IdTratta)
-      );
-
-
-CREATE TABLE IF NOT EXISTS Multa (
-IdMulta INTEGER AUTO_INCREMENT=1,
+);
+CREATE TABLE Multa (
+IdMulta INTEGER AUTO_INCREMENT PRIMARY KEY,
 Importo INTEGER,
 Targa VARCHAR(7),
-        Pagato BOOLEAN
-       );
-
-
-
-
+Pagato BOOLEAN
+);
 INSERT INTO Tratta (Limite, Distanza)
     VALUES(
 (70, 20),
@@ -42,12 +32,7 @@ INSERT INTO Tratta (Limite, Distanza)
 (40, 5),
 (90, 30),
 (110, 50))
-
-
-
-
-INSERT INTO Postazione (Tipo, IdTratta)
-    VALUES(
+INSERT INTO Postazione (Tipo, IdTratta) VALUES(
 ('inizio', 1),
 ('fine', 1),
 ('inizio', 2),
@@ -57,4 +42,5 @@ INSERT INTO Postazione (Tipo, IdTratta)
 ('inizio', 4),
 ('fine', 4),
 ('inizio', 5),
-('fine', 5),
+('fine', 5)
+)

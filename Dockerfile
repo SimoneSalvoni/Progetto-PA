@@ -1,6 +1,6 @@
 FROM node:lts-stretch-slim
 WORKDIR /usr/src/app
-#COPY . .
+COPY . .
 RUN npm install
-RUN cd src
-CMD ["node", "index.js"]
+WORKDIR /usr/src/app/src
+#CMD ["node", "index.js"]

@@ -22,7 +22,7 @@ let app = express();
 app.use(fileUpload());
 
 const PORT = process.env.PORT || 3000;
-const HOST = process.hasUncaughtExceptionCaptureCallback.HOST || localhost;
+const HOST = process.env.HOST || localhost;
 
 let listaPost = PostazioneDao.getPostazioni();
 let listaPostId = listaPost.map(x => x.id);
@@ -49,7 +49,6 @@ Questa funzione processa l'arrivo di una nuova rilevazione. È una funzione sepa
 */
 //NON SO SE SERVE ASYNC AWAIT...
 let processaRilevazione = function (targa, req) {
-    let targa = text;
     let postId = req.params.postazione;
     let trattaId;
     let tipoPostazione;
