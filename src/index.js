@@ -24,9 +24,9 @@ const PORT = process.env.PORT || 3000;
 const HOST = process.env.HOST || 'localhost';
 
 let listaPost = await PostazioneDao.getPostazioni();
-let listaPostId = listaPost.map(x => x.id);
+let listaPostId = listaPost.map(x => x.get('idPostazione'));
 let listaTratte = await TrattaDao.getTratte();
-let listaTratteId = listaTratte.map(x => x.id);
+let listaTratteId = listaTratte.map(x => x.get('idTratta'));
 
 /*
 Questa funzione gestisce il log di due situazioni anomale: l'incapacità di Tesseract di estrarre una targa valida da un'immagine
@@ -52,9 +52,9 @@ let processaRilevazione = function (targa, req) {
     let trattaId;
     let tipoPostazione;
     for (let post of listaPost) {
-        if (post.id === postId) {
-            trattaId = post.tratta;
-            tipoPostazione = post.tipo
+        if (post.get('idPostazione') === postId) {
+            trattaId = post.get('idTratta');
+            tipoPostazione = post.get('tipo');
             break;
         }
     }
@@ -64,9 +64,7 @@ let processaRilevazione = function (targa, req) {
         return;
     }
     if (post.tipo === 'inizio') {
-        //RIVEDI I PARAMETRI QUANDO ABBIAMO LA CLASSE E IL COSTRUTTORE
-        let nuovoTransito = new Transito(targa, trattaId, timestamp);
-        TransitoDao.aggiungiTransito(nuovoTransito)
+        TransitoDao.aggiungiTransito(targa, trattaId, timestamp)
         //CI VUOLE LA RISPOSTA???
     }
     else {
@@ -76,34 +74,34 @@ let processaRilevazione = function (targa, req) {
                 ENTRATA NEL TRATTO. Postazione: ${postId}. Tratta: ${trattaId}. Timestamp: ${timestamp}`);
                 return;
             }
-            let timestampInizio = transitoAperto.timestampFine;
+            let timestampInizio = transitoAperto.get('timestampFine');
             let timestampFine = timestamp;
             let distanza;
             let limite;
             for (let tratta of listaTratte) {
-                if (tratta.id === trattaId) {
-                    lunghezza = tratta.distanza;
-                    limite = tratta.limite;
+                if (tratta.get('id') === trattaId) {
+                    lunghezza = tratta.get('distanza');
+                    limite = tratta.get('limite');
                     break;
                 }
             }
             //*1000 al numeratore si semplifica con /1000 al denominatore. *3.6 per averlo in km/h
             let vel = ((distanza) / ((timestampFine - timestampInizio))) * 3.6;
-            let creazioneMulta = (vel, limite) => {
+            let calcoloImporto = (vel, limite) => {
                 let importo;
                 if ((vel - limite < 10)) importo = 1;
                 else if (vel - limite < 40) importo = 2;
                 else if (vel - limite < 60) importo = 4;
                 else importo = 8;
-                return new Multa(targa, importo);
+                return importo;
             };
             if (vel > limite)
                 //RIVEDI I PARAMETRI QUANDO ABBIAMO LA CLASSE E IL COSTRUTTORE
-                TransitoDao.chiudiTransito(transitoAperto, vel, timestampFine).then(() => {
-                    nuovaMulta = creazioneMulta(vel, limite);
-                    MultaDao.creaMulta(nuovaMulta);
+                TransitoDao.chiudiTransito(transitoAperto.get('id'), vel, timestampFine).then(() => {
+                    let importo = calcoloImporto(vel, limite);
+                    MultaDao.creaMulta(targa, importo);
                 });
-            else TransitoDao.chiudiTransito(transitoAperto, vel, timestampFine);
+            else TransitoDao.chiudiTransito(transitoAperto.get('id'), vel, timestampFine);
             //CI VUOLE LA RISPOSTA????
         })
     }
@@ -188,11 +186,11 @@ dei veicoli transitati in una data tratta, con la possibilità di specificare un
 app.get('/listaveicoli/:tratta', (req, res) => {
     let tratta = req.params.tratta;
     let timestampInizio = req.timestampInizio;
-    let timestampFine = req - timestampFine;
+    let timestampFine = req.timestampFine;
     let callback = ({ data: { listaTransiti } }) => {
         let numeroTransiti = listaTransiti.length;
         if (numeroTransiti !== 0) {
-            var velocita = listaTransiti.map(x => x.vel);
+            var velocita = listaTransiti.map(x => x.get('velMedia'));
             var velMedia = velocita.reduce((prec, succ) => prec + succ, 0) / numeroTransiti;
             var velMax = Math.max(...velocita);
             var velMin = Math.min(...velocita);
@@ -204,6 +202,7 @@ app.get('/listaveicoli/:tratta', (req, res) => {
             var velMin = 0;
             var velStd = 0;
         }
+        listaTransiti=listaTransiti.map(x=>x.get());
         let response = JSON.stringify({ transiti: listaTransiti, stat: { media: velMedia, max: velMax, min: velMin, std: velStd } });
         res.send(response)
     }
@@ -251,7 +250,7 @@ app.get('/stat/:targa/:tratta', (req, res) => {
             if (numeroTransiti === 0) {
                 res.send("L'autovettura con la targa richiesta non ha mai attraversato la tratta");
             }
-            var velocita = listaTransiti.map(x => x.vel);
+            var velocita = listaTransiti.map(x => x.get('velMedia'));
             var velMedia = velocita.reduce((prec, succ) => prec + succ, 0) / numeroTransiti;
             var velMax = Math.max(...velocita);
             var velMin = Math.min(...velocita);
@@ -272,12 +271,12 @@ presenti, con le due postazioni di inzio e fine e la distanza fra le due
 app.get("/tratte", (req, res) => {
     let response = { tratte: [] };
     for (let tratta of listaTratte) {
-        let id = tratta.get('idtratta');
+        let id = tratta.get('idTratta');
         let idPostInizio;
         let idPostFine;
         for (let post of listaPost) {
-            if (post.get('idTratta') === id && post.get('tipo') === 'inizio') idPostInizio = post.get('idpostazione');
-            else if (post.get('idTratta') === id && post.get('tipo') === 'fine') idPostFine = post.get('idpostazione');
+            if (post.get('idTratta') === id && post.get('tipo') === 'inizio') idPostInizio = post.get('idPostazione');
+            else if (post.get('idTratta') === id && post.get('tipo') === 'fine') idPostFine = post.get('idPostazione');
         }
         response.tratte.push({ id_tratta: id, post_inizio: idPostInizio, post_fine: idPostFine, distanza: tratta.get('distanza') })
     }
@@ -292,6 +291,7 @@ app.get("/multa/:targa", (req, res) => {
     let targa = req.params.targa;
     try {
         MultaDao.getMulte(targa).then(({ data: { listaMulte } }) => {
+            listaMulte=listaMulte.map(x=>x.get());
             let response = { targa: targa, multe: listaMulte };
             res.send(response);
         })
@@ -308,7 +308,8 @@ attualmente da pagare.
 app.get('/multeaperte', (req, res) => {
     try {
         MultaDao.getMulteDaPagare().then(({ data: { listaMulte } }) => {
-            let response = { multe: listaMulte };
+            listaMulte = listaMulte.map(x => x.get());
+            let response = { multe: listaMulte.get() };
             res.send(response);
         })
     }
@@ -324,8 +325,8 @@ Questa funzione definisce la rotta /propriemulte, con cui un utente car-owner pu
 app.get('/propriemulte', (req, res) => {
     try {
         let listaMulte;
-        let getMulte = async function(){
-            return await MultaDao.getMulte(targa); //VA BENE??
+        let getMulte = async function(targa){
+            return (await MultaDao.getMulte(targa)).map(x=>x.get()); //VA BENE??
         }
         for (let targa of req.targhe) {
             let listaMulteParziale = getMulte(targa);
@@ -348,12 +349,12 @@ app.patch("/pagamento/:idMulta", (req, res) => {
     }
     let idMulta = req.params.idMulta;
     try {
-        MultaDao.getMulta(idMulta).then(({ data: { multa } }) => {
+        MultaDao.getMultaById(idMulta).then(({ data: { multa } }) => {
             let targheUtente = req.targhe;
-            let targaMulta = multa.targa;
+            let targaMulta = multa.get('targa');
             if (!targheUtente.includes(targaMulta))
                 res.status(403).send({ "error": "La multa relativa all'id fornito non appartiene a nessuna delle targhe dell'utente." });
-            else if (multa.pagato)
+            else if (multa.get('pagato'))
                 res.status(403).send({ "error": "La multa relativa all'id fornito è già stata pagata." });
             else MultaDao.pagaMulta(idMulta).then(() => res.send("Pagamento eseguito"));
         })
