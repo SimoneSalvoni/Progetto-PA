@@ -3,15 +3,15 @@ import {Multa} from '../Models/multa.js';
 export var MultaDao = {
   getMulteDaPagare: getMulteDaPagare,
   creazioneMulta: creazioneMulta,
-  findById: findById,
+  getMultaById: getMultaById,
   getMulte: getMulte,
   pagaMulta: pagaMulta
 }
 
 //creazione della multa
-function creazioneMulta(multa) {
-  var newMulta = new Multa(multa);
-  return newMulta.save();
+function creazioneMulta(targa, importo) {
+  var newMulta = await Multa.create({importo: importo, targa: targa, pagato: false});
+  return newMulta; //potenzialmente rimovibile
 }
 
 //si ricercano tutte le multe il cui campo "pagato" risulta falso
@@ -20,7 +20,7 @@ function getMulteDaPagare() {
 }
 
 //si ricerca una specifica multa a partire dal suo id
-function findById(id) {
+function getMultaById(id) {
   return Multa.findByPk(id);
 }
 
