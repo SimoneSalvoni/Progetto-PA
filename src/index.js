@@ -1,16 +1,16 @@
-const express = require("express");
-const fileUpload = require("express-fileupload");
-import db from './Connection/connect.js'
+import 'dotenv/config';
+import express from 'express';
+import fileUpload from 'express-fileupload';
+import {db} from './Connection/connect.js'
 import { unlink, createWriteStream } from 'fs'
 import Tesseract from 'tesseract.js';
-import Multa from './Models/multa.js';
-import Transito from './Models/transito.js';
-import MultaDao from './DAO/multaDao.js';
-import PostazioneDao from './DAO/postazioneDao.js';
-import TransitoDao from './DAO/transitoDao.js';
-import TrattaDao from './DAO/trattaDao.js';
+import {Multa} from './Models/multa.js';
+import {Transito} from './Models/transito.js';
+import {MultaDao} from './DAO/multaDao.js';
+import {PostazioneDao} from './DAO/postazioneDao.js';
+import {TransitoDao} from './DAO/transitoDao.js';
+import {TrattaDao} from './DAO/trattaDao.js';
 import { jwtCheck, checkPostazione, checkTratta, checkDate, checkImmagine, checkJson, checkTarga, checkTarghe, checkTimestamp, errorHandler } from './Middleware/middleware.js';
-
 
 db.authenticate().then(() => {
     console.log('Connesso al database');
@@ -19,14 +19,13 @@ db.authenticate().then(() => {
 })
 
 let app = express();
-app.use(fileUpload());
 
 const PORT = process.env.PORT || 3000;
-const HOST = process.env.HOST || localhost;
+const HOST = process.env.HOST || 'localhost';
 
-let listaPost = PostazioneDao.getPostazioni();
+let listaPost = await PostazioneDao.getPostazioni();
 let listaPostId = listaPost.map(x => x.id);
-let listaTratte = TrattaDao.getTratte();
+let listaTratte = await TrattaDao.getTratte();
 let listaTratteId = listaTratte.map(x => x.id);
 
 /*
@@ -52,7 +51,7 @@ let processaRilevazione = function (targa, req) {
     let postId = req.params.postazione;
     let trattaId;
     let tipoPostazione;
-    for (let post in listaPost) {
+    for (let post of listaPost) {
         if (post.id === postId) {
             trattaId = post.tratta;
             tipoPostazione = post.tipo
@@ -81,7 +80,7 @@ let processaRilevazione = function (targa, req) {
             let timestampFine = timestamp;
             let distanza;
             let limite;
-            for (let tratta in listaTratte) {
+            for (let tratta of listaTratte) {
                 if (tratta.id === trattaId) {
                     lunghezza = tratta.distanza;
                     limite = tratta.limite;
@@ -272,15 +271,15 @@ presenti, con le due postazioni di inzio e fine e la distanza fra le due
 */
 app.get("/tratte", (req, res) => {
     let response = { tratte: [] };
-    for (let tratta in listaTratte) {
-        let id = tratta.id;
+    for (let tratta of listaTratte) {
+        let id = tratta.get('idtratta');
         let idPostInizio;
         let idPostFine;
-        for (let post in listaPost) {
-            if (post.tratta === id && post.tipo === 'inizio') idPostInizio = post.id;
-            else if (post.tratta === id && post.tipo === 'fine') idPostFine = post.id;
+        for (let post of listaPost) {
+            if (post.get('idTratta') === id && post.get('tipo') === 'inizio') idPostInizio = post.get('idpostazione');
+            else if (post.get('idTratta') === id && post.get('tipo') === 'fine') idPostFine = post.get('idpostazione');
         }
-        response.tratte.push({ tratta: id, post_inizio: idPostInizio, post_fine: idPostFine, distanza: tratta.distanza })
+        response.tratte.push({ id_tratta: id, post_inizio: idPostInizio, post_fine: idPostFine, distanza: tratta.get('distanza') })
     }
     res.send(response);
 });
@@ -325,9 +324,11 @@ Questa funzione definisce la rotta /propriemulte, con cui un utente car-owner pu
 app.get('/propriemulte', (req, res) => {
     try {
         let listaMulte;
-        for (let targa in req.targhe) {
-            //AWAIT VA BENE?????
-            let listaMulteParziale = await MultaDao.getMulte(targa);
+        let getMulte = async function(){
+            return await MultaDao.getMulte(targa); //VA BENE??
+        }
+        for (let targa of req.targhe) {
+            let listaMulteParziale = getMulte(targa);
             listaMulte = listaMulte.concat(listaMulteParziale);
         }
         let response = { multe: listaMulte };
@@ -361,10 +362,9 @@ app.patch("/pagamento/:idMulta", (req, res) => {
     }
 });
 
-
 //Qua vengono definiti i middleware da applicare alle varie rotte.
-app.use('/nuovarilevazione/:postazione', jwtCheck('smartautovelox'), checkPostazione(listaPostId), checkTimestamp, checkImmagine, errorHandler);
-app.use('/nuovarilevazione/json/:postazione', jwtCheck('smartautovelox'), checkPostazione(listaPostId), checkTimestamp, checkJson, errorHandler);
+app.use('/nuovarilevazione/:postazione', fileUpload,jwtCheck('smartautovelox'), checkPostazione(listaPostId), checkTimestamp, checkImmagine, errorHandler);
+app.use('/nuovarilevazione/json/:postazione', fileUpload,jwtCheck('smartautovelox'), checkPostazione(listaPostId), checkTimestamp, checkJson, errorHandler);
 app.use('listaveicoli/:tratta', jwtCheck("admin"), checkTratta(listaTratteId), checkDate, errorHandler);
 app.use('/stat/:targa/:tratta', jwtCheck("admin"), checkTratta(listaTratteId), checkTarga, errorHandler);
 app.use('/tratte', jwtCheck("admin"), errorHandler);

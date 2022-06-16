@@ -1,5 +1,5 @@
-const { Sequelize } = require('sequelize');
-import db from './Connection/connect.js'
+import Sequelize from 'sequelize';
+import {db} from '../Connection/connect.js'
 
 export const Transito = db.define('postazioni', {
 	idtransito: {
@@ -15,6 +15,8 @@ export const Transito = db.define('postazioni', {
 	vmedia: Sequelize.FLOAT
 },
 	{
-		initialAutoIncrement: 1
+		initialAutoIncrement: 1,
+		tableName: 'Transito',
+		timestamps: false
 	}
 );

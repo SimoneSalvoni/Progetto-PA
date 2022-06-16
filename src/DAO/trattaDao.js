@@ -1,6 +1,6 @@
-const Tratta = require('../models/tratta.js');
+import {Tratta} from '../Models/tratta.js'
 
-export var trattaDao = {
+export var TrattaDao = {
     findById: findById,
     getTratte: getTratte
 }

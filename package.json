@@ -15,6 +15,7 @@
     "sequelize":"^6.20.1",
     "tesseract.js": "^2.1.5",
     "mysql2":"^2.3.3",
-    "express-fileupload":"^1.4.0"
+    "express-fileupload":"^1.4.0",
+    "dotenv":"^16.0.1"
   }
 }

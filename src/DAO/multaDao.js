@@ -1,6 +1,6 @@
-const Multa = require('../models/multa.js');
+import {Multa} from '../Models/multa.js';
 
-export var multaDao = {
+export var MultaDao = {
   getMulteDaPagare: getMulteDaPagare,
   creazioneMulta: creazioneMulta,
   findById: findById,

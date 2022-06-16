@@ -1,6 +1,6 @@
-const Transito = require('../models/transito.js');
+import { Transito } from "../Models/transito.js";
 
-export var transitoDao = {
+export var TransitoDao = {
   getTransitiTratta: getTransitiTratta,
   aggiungiTransito: aggiungiTransito,
   ricercaTransitoAperto: ricercaTransitoAperto,

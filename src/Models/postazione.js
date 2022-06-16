@@ -1,5 +1,5 @@
-const { Sequelize } = require('sequelize');
-import db from './Connection/connect.js'
+import Sequelize from 'sequelize';
+import {db} from '../Connection/connect.js'
 
 
 export const Postazione = db.define('postazioni', {
@@ -8,10 +8,12 @@ export const Postazione = db.define('postazioni', {
 		primaryKey: true,
 		autoIncrement: true
 	},
-	limite: Sequelize.INTEGER,
-	distanza: Sequelize.FLOAT
+	tipo: Sequelize.STRING,
+	idTratta: Sequelize.INTEGER
 },
 	{
-		initialAutoIncrement: 1
+		initialAutoIncrement: 1,
+		tableName: 'Postazione',
+		timestamps:false
 	}
 );

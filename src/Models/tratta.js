@@ -1,5 +1,5 @@
-const { Sequelize } = require('sequelize');
-import db from './Connection/connect.js'
+import Sequelize from 'sequelize';
+import {db} from '../Connection/connect.js'
 
 
 export const Tratta = db.define('tratte', {
@@ -12,6 +12,8 @@ export const Tratta = db.define('tratte', {
 	distanza: Sequelize.FLOAT,
 },
 	{
-		initialAutoIncrement: 1
+		initialAutoIncrement: 1,
+		tableName:'Tratta',
+		timestamps: false
 	}
 );

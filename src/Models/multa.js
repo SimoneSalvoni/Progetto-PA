@@ -1,5 +1,5 @@
-const { Sequelize } = require('sequelize');
-import db from './Connection/connect.js'
+import Sequelize from 'sequelize';
+import {db} from '../Connection/connect.js';
 
 export const Multa = db.define('postazioni', {
 	idMulta: {
@@ -12,6 +12,8 @@ export const Multa = db.define('postazioni', {
 	pagato: Sequelize.BOOLEAN
 },
 	{
-		initialAutoIncrement: 1
+		initialAutoIncrement: 1,
+		tableName:'Multa',
+		timestamps: false		
 	}
 );

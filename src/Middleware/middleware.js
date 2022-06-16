@@ -1,7 +1,7 @@
 //Questo modulo contiene i middleware che vengono utilizzati dalle varie rotte dell'applicazione, definite in index.js.
 
-const jwt = require('jsonwebtoken');
-
+import jwt from 'jsonwebtoken';
+const {verify} = jwt;
 /*
 Questa funzione è il middleware che controlla il jwt, che deve essere passato con la richiesta. 
 Controlla prima di tutto la sua presenza,e successivamente controlla che corrisponda al ruolo 
@@ -15,7 +15,7 @@ export function jwtCheck(role) {
             const bearerHeader = req.headers.authorization;
             if (typeof bearerHeader !== 'undefined') {
                 const encodedToken = bearerHeader.split(' ')[1];
-                let decodedToken = jwt.verify(encodedToken, process.env.SECRET_KEY);
+                let decodedToken = verify(encodedToken, process.env.SECRET_KEY);
                 if (decodedToken.role === role) {
                     req.token = decodedToken;
                     next();

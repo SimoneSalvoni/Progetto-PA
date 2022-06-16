@@ -1,6 +1,6 @@
-const Postazione = require('../models/postazione.js');
+import { Postazione } from '../Models/postazione.js';
 
-export var postazioneDao = {
+export var PostazioneDao = {
     findById: findById,
     getPostazioni: getPostazioni
 }
@@ -12,5 +12,5 @@ function findById(id) {
 
 //vengono restituite tutte le postazioni presenti sul db
 function getPostazioni() {
-    return Tratta.findAll();
+    return Postazione.findAll();
 }

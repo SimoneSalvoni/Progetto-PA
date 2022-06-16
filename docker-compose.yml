@@ -15,7 +15,9 @@ services:
         build: .
         ports:
           - ${PORT}:${EXTERNAL_PORT}
+        command:
+          tail -F anything
         depends_on:
           - mysqldb
-        #volumes:
-        #  - ./${pwd}
+        volumes:
+          - .:/usr/src/app/src
