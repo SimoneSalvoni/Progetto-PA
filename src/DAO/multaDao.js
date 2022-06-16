@@ -9,7 +9,7 @@ export var MultaDao = {
 }
 
 //creazione della multa
-function creazioneMulta(targa, importo) {
+async function creazioneMulta(targa, importo) {
   var newMulta = await Multa.create({importo: importo, targa: targa, pagato: false});
   return newMulta; //potenzialmente rimovibile
 }

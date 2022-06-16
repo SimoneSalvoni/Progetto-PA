@@ -12,8 +12,8 @@ export var TransitoDao = {
   eliminaTransitiErrati: eliminaTransitiErrati
 }
 //si aggiunge una tupla alla tabella transito su db
-function aggiungiTransito(targa, tratta, timestampInizio) {
-  var newTransito = await Transito.create({tratta: tratta, apertura: true, targa: targa, timestampInizio: timestampInizio});
+async function aggiungiTransito(targa, tratta, timestampInizio) {
+  var newTransito = Transito.create({tratta: tratta, apertura: true, targa: targa, timestampInizio: timestampInizio});
   return newTransito; //potenzialmente rimovibile
 }
 
@@ -29,9 +29,9 @@ function ricercaTransitoAperto(targa, tratta) {
 
 
 //vengono restituiti tutti i transiti su una specifica tratta
-function getTransitiTratta(id) {
+async function getTransitiTratta(id) {
 
-  return Transito.findAll({
+  return await Transito.findAll({
     where:
     {
       tratta: id
@@ -40,9 +40,9 @@ function getTransitiTratta(id) {
 }
 
 //vengono restituiti tutti i transiti su una specifica tratta nell'arco di tempo richiesto
-function getTransitiTrattaData(id, startDate, endDate) {
+async function getTransitiTrattaData(id, startDate, endDate) {
 
-  return Transito.findAll({
+  return await Transito.findAll({
     where:
     {
       tempofin: $between[startDate, endDate],

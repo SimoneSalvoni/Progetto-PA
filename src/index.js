@@ -1,16 +1,14 @@
 import 'dotenv/config';
 import express from 'express';
 import fileUpload from 'express-fileupload';
-import {db} from './Connection/connect.js'
+import { db } from './Connection/connect.js'
 import { unlink, createWriteStream } from 'fs'
 import Tesseract from 'tesseract.js';
-import {Multa} from './Models/multa.js';
-import {Transito} from './Models/transito.js';
-import {MultaDao} from './DAO/multaDao.js';
-import {PostazioneDao} from './DAO/postazioneDao.js';
-import {TransitoDao} from './DAO/transitoDao.js';
-import {TrattaDao} from './DAO/trattaDao.js';
-import { jwtCheck, checkPostazione, checkTratta, checkDate, checkImmagine, checkJson, checkTarga, checkTarghe, checkTimestamp, errorHandler } from './Middleware/middleware.js';
+import { MultaDao } from './DAO/multaDao.js';
+import { PostazioneDao } from './DAO/postazioneDao.js';
+import { TransitoDao } from './DAO/transitoDao.js';
+import { TrattaDao } from './DAO/trattaDao.js';
+import { jwtCheck, checkPostazione, checkTratta, checkDate, checkFile, checkTarga, checkTarghe, checkTimestamp, errorHandler } from './Middleware/middleware.js';
 
 db.authenticate().then(() => {
     console.log('Connesso al database');
@@ -19,6 +17,7 @@ db.authenticate().then(() => {
 })
 
 let app = express();
+app.use(fileUpload());
 
 const PORT = process.env.PORT || 3000;
 const HOST = process.env.HOST || 'localhost';
@@ -27,6 +26,16 @@ let listaPost = await PostazioneDao.getPostazioni();
 let listaPostId = listaPost.map(x => x.get('idPostazione'));
 let listaTratte = await TrattaDao.getTratte();
 let listaTratteId = listaTratte.map(x => x.get('idTratta'));
+
+
+//Qua vengono definiti i middleware da applicare alle varie rotte.
+app.use('/nuovarilevazione/:postazione', jwtCheck('smartautovelox'), checkPostazione(listaPostId), checkTimestamp, checkFile, errorHandler);
+app.use('listaveicoli/:tratta', jwtCheck("admin"), checkTratta(listaTratteId), checkDate, errorHandler);
+app.use('/stat/:targa/:tratta', jwtCheck("admin"), checkTratta(listaTratteId), checkTarga, errorHandler);
+app.use('/tratte', jwtCheck("admin"), errorHandler);
+app.use('multa/:targa', jwtCheck("admin"), checkTarga, errorHandler);
+app.use('/propriemulte', jwtCheck("car-owner"), checkTarghe, errorHandler);
+app.use('/pagamento/:id_multa', jwtCheck("car-owner"), checkTarghe, errorHandler)
 
 /*
 Questa funzione gestisce il log di due situazioni anomale: l'incapacità di Tesseract di estrarre una targa valida da un'immagine
@@ -39,90 +48,94 @@ let logError = function (mess) {
     stream.write(mess + '\n');
 }
 
-
 /*
-Questa funzione processa l'arrivo di una nuova rilevazione. È una funzione separata dato che è utilizzata da due rotte differenti.
+Questa funzione esegue la scansione dell'immagine con Tesseract
 
-@param targa {string} la targa rilevata dall'immagine o dal json
-@param req {Object} la richiesta da processare, che contiene dati da recuperare.
+@param filePath {string} è il path in cui è salvata l'immagine
 */
-//NON SO SE SERVE ASYNC AWAIT...
-let processaRilevazione = function (targa, req) {
-    let postId = req.params.postazione;
-    let trattaId;
-    let tipoPostazione;
-    for (let post of listaPost) {
-        if (post.get('idPostazione') === postId) {
-            trattaId = post.get('idTratta');
-            tipoPostazione = post.get('tipo');
-            break;
-        }
-    }
-    let timestamp = req.timestamp;
-    if (typeof (targa) !== "string" || targa === '' || !targa.test("[A-Z0-9]{7}")) {
-        logError(`ERRORE:TARGA ILLEGGIBILE. Postazione: ${postId}. Tratta: ${trattaId}. Timestamp: ${timestamp}`);
-        return;
-    }
-    if (post.tipo === 'inizio') {
-        TransitoDao.aggiungiTransito(targa, trattaId, timestamp)
-        //CI VUOLE LA RISPOSTA???
-    }
-    else {
-        TransitoDao.ricercaTransitoAperto(targa, trattaId).then(({ data: { transitoAperto } }) => {
-            if (!transitoAperto) {
-                logError(`ERRORE:RILEVATO TRANSITO DI AUTOVETTURA ALLA FINE DI UN TRATTO SENZA LA PRECEDENTE RILEVAZIONE DI \
-                ENTRATA NEL TRATTO. Postazione: ${postId}. Tratta: ${trattaId}. Timestamp: ${timestamp}`);
-                return;
-            }
-            let timestampInizio = transitoAperto.get('timestampFine');
-            let timestampFine = timestamp;
-            let distanza;
-            let limite;
-            for (let tratta of listaTratte) {
-                if (tratta.get('id') === trattaId) {
-                    lunghezza = tratta.get('distanza');
-                    limite = tratta.get('limite');
-                    break;
-                }
-            }
-            //*1000 al numeratore si semplifica con /1000 al denominatore. *3.6 per averlo in km/h
-            let vel = ((distanza) / ((timestampFine - timestampInizio))) * 3.6;
-            let calcoloImporto = (vel, limite) => {
-                let importo;
-                if ((vel - limite < 10)) importo = 1;
-                else if (vel - limite < 40) importo = 2;
-                else if (vel - limite < 60) importo = 4;
-                else importo = 8;
-                return importo;
-            };
-            if (vel > limite)
-                //RIVEDI I PARAMETRI QUANDO ABBIAMO LA CLASSE E IL COSTRUTTORE
-                TransitoDao.chiudiTransito(transitoAperto.get('id'), vel, timestampFine).then(() => {
-                    let importo = calcoloImporto(vel, limite);
-                    MultaDao.creaMulta(targa, importo);
-                });
-            else TransitoDao.chiudiTransito(transitoAperto.get('id'), vel, timestampFine);
-            //CI VUOLE LA RISPOSTA????
-        })
-    }
-};
+let scansioneImmagine = async function (filePath) {
+    const { data: { text } } = await Tesseract.recognize(filePath, 'eng');
+    return text;
+}
+
 
 /*
 Questa funzione definisce la rotta /nuovarilevazione/:postazione che permette ad un utente smartautovelox di spedire una nuova 
 rilevazione di passaggio di un'automobile. In questo caso l'autovelox spedisce un'immagine della targa
 */
 app.post('/nuovarilevazione/:postazione', (req, res) => {
-    let file = req.files.file;
-    let filePath = __dirname + '/tmp/' + file.name;
-    sampleFile.mv(filePath, (err) => {
-        //SPEDISCO L'ERRORE O NO?
-        if (err) res.status(500).send({ "errore": "Errore interno del server" });
-    });
     try {
-        Tesseract.recognize(
-            filePath,
-            'eng'
-        ).then(({ data: { text } }) => processaRilevazione(text, req)) //SERVE AWAIT????
+        let file = req.files.file;
+        let targa;
+        let filePath = '../tmp/' + file.name;
+        file.mv(filePath, (err) => {
+            //SPEDISCO L'ERRORE O NO?
+            if (err) res.status(500).send({ "errore": "Errore interno del server" });
+        });
+        if (req.fileType == 'image') {
+            targa = scansioneImmagine(filePath);
+        }
+        else {
+            let jsonFile = require(filePath);
+            if (!jsonFile.targa) res.status(400).send({ 'errore': 'Targa mancante nel file JSON' });
+            targa = jsonFile.targa;
+        }
+        let postId = parseInt(req.params.postazione);
+        targa = targa.replace('-', '');
+        let trattaId;
+        let tipoPostazione;
+        for (let post of listaPost) {
+            if (post.get('idPostazione') === postId) {
+                trattaId = post.get('idTratta');
+                tipoPostazione = post.get('tipo');
+                break;
+            }
+        }
+        let timestamp = parseInt(req.headers.timestamp);
+        let regex = new RegExp("^[A-Z0-9]{7}$");
+        if (typeof (targa) !== "string" || targa === '' || !regex.test(targa)) {
+            logError(`ERRORE:TARGA ILLEGGIBILE. Postazione: ${postId}. Tratta: ${trattaId}. Timestamp: ${timestamp}`);
+            res.sendStatus(200);
+        }
+        if (tipoPostazione === 'inizio') {
+            TransitoDao.aggiungiTransito(targa, trattaId, timestamp).then(() => res.sendStatus(200))
+        }
+        else {
+            TransitoDao.ricercaTransitoAperto(targa, trattaId).then(({ data: { transitoAperto } }) => {
+                if (!transitoAperto) {
+                    logError(`ERRORE:RILEVATO TRANSITO DI AUTOVETTURA ALLA FINE DI UN TRATTO SENZA LA PRECEDENTE RILEVAZIONE DI \
+                ENTRATA NEL TRATTO. Postazione: ${postId}. Tratta: ${trattaId}. Timestamp: ${timestamp}`);
+                    res.sendStatus(200);
+                }
+                else {
+                    let timestampInizio = transitoAperto.get('timestampFine');
+                    let timestampFine = timestamp;
+                    let distanza;
+                    let limite;
+                    for (let tratta of listaTratte) {
+                        if (tratta.get('id') === trattaId) {
+                            lunghezza = tratta.get('distanza');
+                            limite = tratta.get('limite');
+                            break;
+                        }
+                    }
+                    //*1000 al numeratore si semplifica con /1000 al denominatore. *3.6 per averlo in km/h
+                    let vel = ((distanza) / ((timestampFine - timestampInizio))) * 3.6;
+                    if (vel > limite) {
+                        let importo;
+                        if ((vel - limite < 10)) importo = 1;
+                        else if (vel - limite < 40) importo = 2;
+                        else if (vel - limite < 60) importo = 4;
+                        else importo = 8;
+                        TransitoDao.chiudiTransito(transitoAperto.get('id'), vel, timestampFine).then(() => {
+                            MultaDao.creaMulta(targa, importo).then(() => res.sendStatus(200))
+                        });
+                    }
+                    else TransitoDao.chiudiTransito(transitoAperto.get('id'), vel, timestampFine).then(() => res.sendStatus(200));
+                    //CI VUOLE LA RISPOSTA????}
+                }
+            })
+        }
     }
     catch (err) {
         res.status(500).send({ "errore": "Errore interno del server" });
@@ -136,61 +149,28 @@ app.post('/nuovarilevazione/:postazione', (req, res) => {
         */
         //prima però provo async
         try {
-            unlink(filePath);
+            unlink(filePath, () => { });
         } catch (error) {
-            console.error('there was an error while deleting the file:', error.message);
+            console.error('Errore durante la cancellazione del file:', error.message);
         }
     }
 })
-
-/*
-Questa funzione definisce la rotta /nuovarilevazione/json/:postazione che permette ad un utente smartautovelox di spedire una nuova 
-rilevazione di passaggio di un'automobile. In questo caso l'autovelox spedisce un json del tipo {targa:"XX XXX XX"}
-*/
-app.post('/nuovarilevazione/json/:postazione', (req, res) => {
-    let file = req.files.file;
-    let filePath = __dirname + '/tmp/' + file.name;
-    sampleFile.mv(filePath, (err) => {
-        //SPEDISCO L'ERRORE O NO?
-        if (err) res.status(500).send({ "errore": "Errore interno del server" });
-    });
-    try {
-        let jsonFile = require(filePath);
-        if (!jsonFile.targa) res.status(400).send({ 'errore': 'Targa mancante nel file JSON' });
-        //SERVE AWAIT???
-        processaRilevazione(jsonFile.targa, req);
-    }
-    catch (err) {
-        res.status(500).send({ "errore": "Errore interno del server" });
-    }
-    finally {
-        /*
-        POTREI DOVER FARE COSI' SE NON CANCELLA BENE
-        var tempFile = fs.openSync(filePath, 'r');
-        fs.closeSync(tempFile);
-        fs.unlinkSync(filePath);
-        */
-        //prima però provo async
-        try {
-            unlink(filePath);
-        } catch (error) {
-            console.error('there was an error while deleting the file:', error.message);
-        }
-    }
-});
 
 /*
 Questa è la definizione della rotta /listaveicoli/:tratta, che serve ad un utente di tipo admin per richiedere una lista 
 dei veicoli transitati in una data tratta, con la possibilità di specificare un intervallo temporale, con statistiche a riguardo
 */
 app.get('/listaveicoli/:tratta', (req, res) => {
-    let tratta = req.params.tratta;
-    let timestampInizio = req.timestampInizio;
-    let timestampFine = req.timestampFine;
-    let callback = ({ data: { listaTransiti } }) => {
+    let tratta = parseInt(req.params.tratta);
+    let timestampInizio = parseInt(req.timestampInizio);
+    let timestampFine = parseInt(req.timestampFine);
+    try {
+        let transiti;
+        if (timestampInizio === -1) listaTransiti = TransitoDao.getTransitiTratta(tratta);
+        else listaTransiti = TransitoDao.getTransitiTrattaData(tratta, timestampInizio, timestampFine);
         let numeroTransiti = listaTransiti.length;
         if (numeroTransiti !== 0) {
-            var velocita = listaTransiti.map(x => x.get('velMedia'));
+            var velocita = listaTransiti.map(x => x.vel);
             var velMedia = velocita.reduce((prec, succ) => prec + succ, 0) / numeroTransiti;
             var velMax = Math.max(...velocita);
             var velMin = Math.min(...velocita);
@@ -202,35 +182,8 @@ app.get('/listaveicoli/:tratta', (req, res) => {
             var velMin = 0;
             var velStd = 0;
         }
-        listaTransiti=listaTransiti.map(x=>x.get());
         let response = JSON.stringify({ transiti: listaTransiti, stat: { media: velMedia, max: velMax, min: velMin, std: velStd } });
         res.send(response)
-    }
-
-    try {
-        /*
-        CANCELLA SE FUNZIONA CON LA CALLBACK
-        TransitoDao.getTransitiTrattaData(tratta, timestampInizio, timestampFine).then(({ data: { listaTransiti } }) => {
-            let numeroTransiti = listaTransiti.length;
-            if (numeroTransiti !== 0) {
-                var velocita = listaTransiti.map(x => x.vel);
-                var velMedia = velocita.reduce((prec, succ) => prec + succ, 0) / numeroTransiti;
-                var velMax = Math.max(...velocita);
-                var velMin = Math.min(...velocita);
-                var velStd = Math.sqrt(velocita.map(x => Math.pow(x - velMedia, 2)).reduce((a, b) => a + b) / numeroTransiti);
-            }
-            else {
-                var velMedia = 0;
-                var velMax = 0;
-                var velMin = 0;
-                var velStd = 0;
-            }
-            let response = JSON.stringify({ transiti: listaTransiti, stat: { media: velMedia, max: velMax, min: velMin, std: velStd } });
-            res.send(response)
-        })
-        */
-        if (timestampInizio === -1) TransitoDao.getTransitiTratta(tratta).then(callback);
-        else TransitoDao.getTransitiTrattaData(tratta, timestampInizio, timestampFine).then(callback);
     }
     catch (err) {
         res.status(500).send({ "error": "Errore interno del server" });
@@ -242,7 +195,7 @@ Questa è la definizione della rotta /stat/:targa/:tratta, che serve ad un utent
 riguardanti i viaggi di una particolare targa su una particolare targa
 */
 app.get('/stat/:targa/:tratta', (req, res) => {
-    let tratta = req.params.tratta;
+    let tratta = parseInt(req.params.tratta);
     let targa = req.targa;
     try {
         TransitoDao.getTransitiTarga(tratta, targa).then(({ data: { listaTransiti } }) => {
@@ -250,13 +203,15 @@ app.get('/stat/:targa/:tratta', (req, res) => {
             if (numeroTransiti === 0) {
                 res.send("L'autovettura con la targa richiesta non ha mai attraversato la tratta");
             }
-            var velocita = listaTransiti.map(x => x.get('velMedia'));
-            var velMedia = velocita.reduce((prec, succ) => prec + succ, 0) / numeroTransiti;
-            var velMax = Math.max(...velocita);
-            var velMin = Math.min(...velocita);
-            var velStd = Math.sqrt(velocita.map(x => Math.pow(x - velMedia, 2)).reduce((a, b) => a + b) / numeroTransiti);
-            let response = JSON.stringify({ stat: { media: velMedia, max: velMax, min: velMin, std: velStd } });
-            res.send(response)
+            else {
+                var velocita = listaTransiti.map(x => x.get('velMedia'));
+                var velMedia = velocita.reduce((prec, succ) => prec + succ, 0) / numeroTransiti;
+                var velMax = Math.max(...velocita);
+                var velMin = Math.min(...velocita);
+                var velStd = Math.sqrt(velocita.map(x => Math.pow(x - velMedia, 2)).reduce((a, b) => a + b) / numeroTransiti);
+                let response = JSON.stringify({ stat: { media: velMedia, max: velMax, min: velMin, std: velStd } });
+                res.send(response)
+            }
         })
     }
     catch (err) {
@@ -291,7 +246,7 @@ app.get("/multa/:targa", (req, res) => {
     let targa = req.params.targa;
     try {
         MultaDao.getMulte(targa).then(({ data: { listaMulte } }) => {
-            listaMulte=listaMulte.map(x=>x.get());
+            listaMulte = listaMulte.map(x => x.get());
             let response = { targa: targa, multe: listaMulte };
             res.send(response);
         })
@@ -325,8 +280,8 @@ Questa funzione definisce la rotta /propriemulte, con cui un utente car-owner pu
 app.get('/propriemulte', (req, res) => {
     try {
         let listaMulte;
-        let getMulte = async function(targa){
-            return (await MultaDao.getMulte(targa)).map(x=>x.get()); //VA BENE??
+        let getMulte = async function (targa) {
+            return (await MultaDao.getMulte(targa)).map(x => x.get()); //VA BENE??
         }
         for (let targa of req.targhe) {
             let listaMulteParziale = getMulte(targa);
@@ -347,7 +302,7 @@ app.patch("/pagamento/:idMulta", (req, res) => {
         let err = new Error("Id della multa mancante");
         res.status(400).send({ error: err.message });
     }
-    let idMulta = req.params.idMulta;
+    let idMulta = parseInt(req.params.idMulta);
     try {
         MultaDao.getMultaById(idMulta).then(({ data: { multa } }) => {
             let targheUtente = req.targhe;
@@ -362,16 +317,6 @@ app.patch("/pagamento/:idMulta", (req, res) => {
         res.status(500).send({ "error": "Errore interno del server" });
     }
 });
-
-//Qua vengono definiti i middleware da applicare alle varie rotte.
-app.use('/nuovarilevazione/:postazione', fileUpload,jwtCheck('smartautovelox'), checkPostazione(listaPostId), checkTimestamp, checkImmagine, errorHandler);
-app.use('/nuovarilevazione/json/:postazione', fileUpload,jwtCheck('smartautovelox'), checkPostazione(listaPostId), checkTimestamp, checkJson, errorHandler);
-app.use('listaveicoli/:tratta', jwtCheck("admin"), checkTratta(listaTratteId), checkDate, errorHandler);
-app.use('/stat/:targa/:tratta', jwtCheck("admin"), checkTratta(listaTratteId), checkTarga, errorHandler);
-app.use('/tratte', jwtCheck("admin"), errorHandler);
-app.use('multa/:targa', jwtCheck("admin"), checkTarga, errorHandler);
-app.use('/propriemulte', jwtCheck("car-owner"), checkTarghe, errorHandler);
-app.use('/pagamento/:id_multa', jwtCheck("car-owner"), checkTarghe, errorHandler)
 
 app.listen(PORT, HOST, err => {
     if (err) return console.log(`Impossibile ascoltare sull host ${HOST} nella porta: ${PORT}`);
