@@ -8,7 +8,7 @@ export const Transito = db.define('postazioni', {
 		autoIncrement: true
 	},
 	tratta: Sequelize.INTEGER,
-	apertura: Sequelize.BOOLEAN,
+	aperto: Sequelize.BOOLEAN,
 	targa: Sequelize.STRING(7),
 	timestampInizio: Sequelize.STRING(20),
 	timestampFine: Sequelize.STRING(20),

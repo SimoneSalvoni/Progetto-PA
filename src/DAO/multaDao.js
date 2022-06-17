@@ -2,14 +2,14 @@ import {Multa} from '../Models/multa.js';
 
 export var MultaDao = {
   getMulteDaPagare: getMulteDaPagare,
-  creazioneMulta: creazioneMulta,
+  creaMulta: creaMulta,
   getMultaById: getMultaById,
   getMulte: getMulte,
   pagaMulta: pagaMulta
 }
 
 //creazione della multa
-async function creazioneMulta(targa, importo) {
+async function creaMulta(targa, importo) {
   var newMulta = await Multa.create({importo: importo, targa: targa, pagato: false});
   return newMulta; //potenzialmente rimovibile
 }

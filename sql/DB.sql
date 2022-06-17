@@ -13,7 +13,7 @@ idTratta INTEGER REFERENCES Tratta (idTratta)
 );
 CREATE TABLE Transito (
 idTransito INTEGER AUTO_INCREMENT PRIMARY KEY,
-apertura BOOLEAN,
+aperto BOOLEAN,
 timestampInizio VARCHAR(20),
 timestampFine VARCHAR(20),
 velMedia NUMERIC(6 , 2 ),
@@ -22,7 +22,7 @@ tratta INTEGER REFERENCES Tratta (idTratta)
 );
 CREATE TABLE Multa (
 idMulta INTEGER AUTO_INCREMENT PRIMARY KEY,
-importo INTEGER,
+importo NUMERIC(4,2),
 targa VARCHAR(7),
 pagato BOOLEAN
 );

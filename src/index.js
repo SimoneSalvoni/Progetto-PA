@@ -48,40 +48,35 @@ let logError = function (mess) {
     stream.write(mess + '\n');
 }
 
-/*
-Questa funzione esegue la scansione dell'immagine con Tesseract
-
-@param filePath {string} è il path in cui è salvata l'immagine
-*/
-let scansioneImmagine = async function (filePath) {
-    const { data: { text } } = await Tesseract.recognize(filePath, 'eng');
-    return text;
-}
-
 
 /*
 Questa funzione definisce la rotta /nuovarilevazione/:postazione che permette ad un utente smartautovelox di spedire una nuova 
 rilevazione di passaggio di un'automobile. In questo caso l'autovelox spedisce un'immagine della targa
 */
-app.post('/nuovarilevazione/:postazione', (req, res) => {
+app.post('/nuovarilevazione/:postazione', async (req, res) => {
     try {
         let file = req.files.file;
         let targa;
-        let filePath = '../tmp/' + file.name;
+        var filePath = '../tmp/' + file.name;
+        let error = false;
         file.mv(filePath, (err) => {
-            //SPEDISCO L'ERRORE O NO?
-            if (err) res.status(500).send({ "errore": "Errore interno del server" });
+            if (err) error = true;
         });
-        if (req.fileType == 'image') {
-            targa = scansioneImmagine(filePath);
+        //SPEDISCO L'ERRORE O NO?
+        if (error) return res.status(500).send({ "errore": "Errore interno del server" });
+        else if (req.fileType == 'image') {
+            //scansioneImmagine(filePath).then(({data:text})=>targa=text);
+            let result = await Tesseract.recognize(filePath, 'eng');
+            targa = result.data.text;
         }
         else {
             let jsonFile = require(filePath);
-            if (!jsonFile.targa) res.status(400).send({ 'errore': 'Targa mancante nel file JSON' });
+            if (!jsonFile.targa) return res.status(400).send({ 'errore': 'Targa mancante nel file JSON' });
             targa = jsonFile.targa;
         }
         let postId = parseInt(req.params.postazione);
         targa = targa.replace('-', '');
+        targa = targa.replace('\n', '');
         let trattaId;
         let tipoPostazione;
         for (let post of listaPost) {
@@ -92,53 +87,68 @@ app.post('/nuovarilevazione/:postazione', (req, res) => {
             }
         }
         let timestamp = parseInt(req.headers.timestamp);
-        let regex = new RegExp("^[A-Z0-9]{7}$");
+        let regex = new RegExp('^[A-Z0-9]{7}$');
         if (typeof (targa) !== "string" || targa === '' || !regex.test(targa)) {
             logError(`ERRORE:TARGA ILLEGGIBILE. Postazione: ${postId}. Tratta: ${trattaId}. Timestamp: ${timestamp}`);
-            res.sendStatus(200);
+            return res.sendStatus(200);
         }
         if (tipoPostazione === 'inizio') {
-            TransitoDao.aggiungiTransito(targa, trattaId, timestamp).then(() => res.sendStatus(200))
+            //await TransitoDao.aggiungiTransito(targa, trattaId, timestamp).then(() => res.sendStatus(200))
+            await TransitoDao.aggiungiTransito(targa, trattaId, timestamp);
+            return res.sendStatus(200);
         }
         else {
-            TransitoDao.ricercaTransitoAperto(targa, trattaId).then(({ data: { transitoAperto } }) => {
-                if (!transitoAperto) {
-                    logError(`ERRORE:RILEVATO TRANSITO DI AUTOVETTURA ALLA FINE DI UN TRATTO SENZA LA PRECEDENTE RILEVAZIONE DI \
+            let data = await TransitoDao.ricercaTransitoAperto(targa, trattaId);
+            let transitoAperto = data.dataValues;
+            if (!transitoAperto) {
+                logError(`ERRORE:RILEVATO TRANSITO DI AUTOVETTURA ALLA FINE DI UN TRATTO SENZA LA PRECEDENTE RILEVAZIONE DI\
                 ENTRATA NEL TRATTO. Postazione: ${postId}. Tratta: ${trattaId}. Timestamp: ${timestamp}`);
-                    res.sendStatus(200);
-                }
-                else {
-                    let timestampInizio = transitoAperto.get('timestampFine');
-                    let timestampFine = timestamp;
-                    let distanza;
-                    let limite;
-                    for (let tratta of listaTratte) {
-                        if (tratta.get('id') === trattaId) {
-                            lunghezza = tratta.get('distanza');
-                            limite = tratta.get('limite');
-                            break;
-                        }
+                return res.sendStatus(200); //FORSE MEGLIO NON OK
+            }
+            else {
+                let timestampInizio = parseInt(transitoAperto.timestampInizio);
+                let timestampFine = timestamp;
+                let distanza;
+                let limite;
+                for (let tratta of listaTratte) {
+                    if (tratta.get('idTratta') === trattaId) {
+                        distanza = tratta.get('distanza');
+                        limite = tratta.get('limite');
+                        break;
                     }
-                    //*1000 al numeratore si semplifica con /1000 al denominatore. *3.6 per averlo in km/h
-                    let vel = ((distanza) / ((timestampFine - timestampInizio))) * 3.6;
-                    if (vel > limite) {
-                        let importo;
-                        if ((vel - limite < 10)) importo = 1;
-                        else if (vel - limite < 40) importo = 2;
-                        else if (vel - limite < 60) importo = 4;
-                        else importo = 8;
-                        TransitoDao.chiudiTransito(transitoAperto.get('id'), vel, timestampFine).then(() => {
-                            MultaDao.creaMulta(targa, importo).then(() => res.sendStatus(200))
-                        });
-                    }
-                    else TransitoDao.chiudiTransito(transitoAperto.get('id'), vel, timestampFine).then(() => res.sendStatus(200));
-                    //CI VUOLE LA RISPOSTA????}
                 }
-            })
+                //si moltiplica per 3.600.000 per averlo in km/h
+                if (timestampInizio === timestampFine) {
+                    logError(`ERRORE:RILEVATO TRANSITO DI AUTOVETTURA AD INIZIO E FINE TRATTA\
+                        CON LO STESSO TIMESTAMP. Postazione: ${postId}. Tratta: ${trattaId}. Timestamp: ${timestamp}`)
+                    return res.sendStatus(200);
+                }
+                let vel = ((distanza) / ((timestampFine - timestampInizio))) * 3600000;
+                if (vel > limite) {
+                    let importo;
+                    if ((vel - limite < 10)) importo = 1;
+                    else if (vel - limite < 40) importo = 2;
+                    else if (vel - limite < 60) importo = 4;
+                    else importo = 8;
+                    /*
+                    TransitoDao.chiudiTransito(transitoAperto.idTransito, vel, timestampFine).then(() => {
+                        MultaDao.creaMulta(targa, importo).then(() => res.sendStatus(200))
+                    });
+                    */
+                    await TransitoDao.chiudiTransito(transitoAperto.idTransito, vel, timestampFine);
+                    await MultaDao.creaMulta(targa, importo);
+                    return res.sendStatus(200);
+                }
+                else{
+                    await TransitoDao.chiudiTransito(transitoAperto.idTransito, vel, timestampFine);
+                    return res.sendStatus(200);
+                } //TransitoDao.chiudiTransito(transitoAperto.idTransito, vel, timestampFine).then(() => res.sendStatus(200));
+            }
         }
     }
     catch (err) {
-        res.status(500).send({ "errore": "Errore interno del server" });
+        console.log(err)
+        return res.status(500).send({ "errore": "Errore interno del server" });
     }
     finally {
         /*
@@ -318,15 +328,18 @@ app.patch("/pagamento/:idMulta", (req, res) => {
     }
 });
 
+/*È possibile che venga rilevato il passaggio di un veicolo all'ingresso di una tratta ma non della fine. Per evitare di mantenere 
+transiti aperti per troppo tempo, si definisce un operazione che viene ripetuta ciclamente di pulizia del DB.
+*/
+/*
+setInterval(() => {
+    let date = new Date();
+    TransitoDao.eliminaTransitiErrati(date.getTime());
+}, 100000000000);
+*/
+
+
 app.listen(PORT, HOST, err => {
     if (err) return console.log(`Impossibile ascoltare sull host ${HOST} nella porta: ${PORT}`);
     console.log(`server in ascolto su: http://${HOST}:${PORT}/`);
 });
-
-
-/*È possibile che venga rilevato il passaggio di un veicolo all'ingresso di una tratta ma non della fine. Per evitare di mantenere 
-transiti aperti per troppo tempo, si definisce un operazione che viene ripetuta ciclamente di pulizia del DB.
-*/
-setInterval(() => {
-    TransitoDao.eliminaTransitiErrati(Date.getTime());
-}, 1000000000);

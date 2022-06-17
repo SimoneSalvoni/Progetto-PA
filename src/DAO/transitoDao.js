@@ -13,7 +13,7 @@ export var TransitoDao = {
 }
 //si aggiunge una tupla alla tabella transito su db
 async function aggiungiTransito(targa, tratta, timestampInizio) {
-  var newTransito = Transito.create({tratta: tratta, apertura: true, targa: targa, timestampInizio: timestampInizio});
+  var newTransito = await Transito.create({ tratta: tratta, aperto: true, targa: targa, timestampInizio: timestampInizio });
   return newTransito; //potenzialmente rimovibile
 }
 
@@ -23,8 +23,8 @@ function findById(id) {
 }
 
 //viene restituito uno specifico Transito con valore di "aperto" true a partire dalla Tratta percorsa e la Targa del veicolo
-function ricercaTransitoAperto(targa, tratta) {
-  return Transito.findOne({ where: { targa: targa, tratta: tratta, aperto: true } });
+async function ricercaTransitoAperto(targa, tratta) {
+  return await Transito.findOne({ where: { targa: targa, tratta: tratta, aperto: true } });
 }
 
 
@@ -71,18 +71,14 @@ function eliminaTransitiErrati(date) {
 
 
 //viene modificato il campo "aperto" e il campo "tempofin" di uno specifico transito a partire dal suo id
-function chiudiTransito(id, vel, tempo) {
-
-  Transito.findByPk(id)
-    .on('success', function (transito) {
-      // Check if record exists in db
-      if (transito) {
-        transito.update({
-          aperto: false,
-          velMedia: vel,
-          timestampFine: tempo
-        })
-          .success(function () { })
-      }
+async function chiudiTransito(id, vel, tempo) {
+  // Check if record exists in db
+  let transito = await Transito.findByPk(id);
+  if (transito) {
+    await transito.update({
+      aperto: false,
+      velMedia: vel,
+      timestampFine: tempo
     })
+  }
 }
