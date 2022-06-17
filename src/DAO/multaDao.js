@@ -25,20 +25,12 @@ function getMultaById(id) {
 }
 
 //si ricercano tutte le multe relative ad una specifica targa
-function getMulte(targa) {
-  return Multa.findAll({ where: { targa: targa } });
+async function getMulte(targa) {
+  return await Multa.findAll({ where: { targa: targa } });
 }
 
 //si cambia il campo "pagato" di una specifica multa a partire dal suo id
-function pagaMulta(id) {
-  Multa.findByPk(id)
-    .on('success', function (multa) {
-      // Check if record exists in db
-      if (multa) {
-        multa.update({
-          pagato: True
-        })
-          .success(function () { })
-      }
-    })
+async function pagaMulta(id) {
+  let multa = await Multa.findByPk(id);
+  if (multa) await multa.update({pagato: True})
 }

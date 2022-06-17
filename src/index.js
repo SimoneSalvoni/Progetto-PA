@@ -187,10 +187,10 @@ app.get('/listaveicoli/:tratta', async (req, res) => {
             var velStd = 0;
         }
         let response = JSON.stringify({ transiti: listaTransiti, stat: { media: velMedia, max: velMax, min: velMin, std: velStd } });
-        res.send(response)
+        return res.send(response)
     }
     catch (err) {
-        res.status(500).send({ "error": "Errore interno del server" });
+        return res.status(500).send({ "error": "Errore interno del server" });
     }
 });
 
@@ -205,7 +205,7 @@ app.get('/stat/:targa/:tratta', (req, res) => {
         TransitoDao.getTransitiTarga(tratta, targa).then(({ data: { listaTransiti } }) => {
             let numeroTransiti = listaTransiti.length;
             if (numeroTransiti === 0) {
-                res.send("L'autovettura con la targa richiesta non ha mai attraversato la tratta");
+                return res.send("L'autovettura con la targa richiesta non ha mai attraversato la tratta");
             }
             else {
                 var velocita = listaTransiti.map(x => x.get('velMedia'));
@@ -214,12 +214,12 @@ app.get('/stat/:targa/:tratta', (req, res) => {
                 var velMin = Math.min(...velocita);
                 var velStd = Math.sqrt(velocita.map(x => Math.pow(x - velMedia, 2)).reduce((a, b) => a + b) / numeroTransiti);
                 let response = JSON.stringify({ stat: { media: velMedia, max: velMax, min: velMin, std: velStd } });
-                res.send(response)
+                return res.send(response)
             }
         })
     }
     catch (err) {
-        res.status(500).send({ "error": "Errore interno del server" });
+       return  res.status(500).send({ "error": "Errore interno del server" });
     }
 });
 
@@ -239,24 +239,23 @@ app.get("/tratte", (req, res) => {
         }
         response.tratte.push({ id_tratta: id, post_inizio: idPostInizio, post_fine: idPostFine, distanza: tratta.get('distanza') })
     }
-    res.send(response);
+    return res.send(response);
 });
 
 /*
 Questa è la definizione della rotta /multa/:targa, che permette ad un utente admin di ottenere la lista di tutte le multe 
 relative ad una particolare targa.
 */
-app.get("/multa/:targa", (req, res) => {
+app.get("/multa/:targa", async (req, res) => {
     let targa = req.params.targa;
     try {
-        MultaDao.getMulte(targa).then(({ data: { listaMulte } }) => {
-            listaMulte = listaMulte.map(x => x.get());
-            let response = { targa: targa, multe: listaMulte };
-            res.send(response);
-        })
+        let data = await MultaDao.getMulte(targa);
+        let listaMulte = data.dataValues;
+        let response = { targa: targa, multe: listaMulte };
+        return res.send(response);
     }
     catch (err) {
-        res.status(500).send({ "error": "Errore interno del server" });
+        return res.status(500).send({ "error": "Errore interno del server" });
     }
 })
 
@@ -264,16 +263,15 @@ app.get("/multa/:targa", (req, res) => {
 Questa è la definizione della rotta /multeaperte, che permette ad un utente admin di ottenere la lista di tutte le multe
 attualmente da pagare.
 */
-app.get('/multeaperte', (req, res) => {
+app.get('/multeaperte', async (req, res) => {
     try {
-        MultaDao.getMulteDaPagare().then(({ data: { listaMulte } }) => {
-            listaMulte = listaMulte.map(x => x.get());
-            let response = { multe: listaMulte.get() };
-            res.send(response);
-        })
+        let data = await MultaDao.getMulteDaPagare();
+        let listaMulte=data.dataValues;
+        let response = { multe: listaMulte };
+        return res.send(response);
     }
     catch (err) {
-        res.status(500).send({ "error": "Errore interno del server" });
+        return res.status(500).send({ "error": "Errore interno del server" });
     }
 })
 
@@ -281,44 +279,44 @@ app.get('/multeaperte', (req, res) => {
 Questa funzione definisce la rotta /propriemulte, con cui un utente car-owner può controllare le proprie multe
 */
 //MODIFICA PER AVERE SOLO UNA TARGA COME ARGOMENTO DI GETMULTE
-app.get('/propriemulte', (req, res) => {
+app.get('/propriemulte', async (req, res) => {
     try {
         let listaMulte;
-        let getMulte = async function (targa) {
-            return (await MultaDao.getMulte(targa)).map(x => x.get()); //VA BENE??
-        }
         for (let targa of req.targhe) {
-            let listaMulteParziale = getMulte(targa);
-            listaMulte = listaMulte.concat(listaMulteParziale);
+            let data = await MultaDao.getMulte(targa);
+            listaMulte = listaMulte.concat(data.dataValues);
         }
         let response = { multe: listaMulte };
-        res.send(response);
+        return res.send(response);
     } catch (error) {
-        res.status(500).send({ "error": "Errore interno del server" });
+        return res.status(500).send({ "error": "Errore interno del server" });
     }
 })
 
 /*
 Questa funzione definisce la rotta /paga/:id_multa, con cui un utente car-owner può pagare una propria multa.
 */
-app.patch("/pagamento/:idMulta", (req, res) => {
+app.patch("/pagamento/:idMulta", async (req, res) => {
     if (!req.params.hasOwnProperty('idMulta')) {
         let err = new Error("Id della multa mancante");
         res.status(400).send({ error: err.message });
     }
     let idMulta = parseInt(req.params.idMulta);
     try {
-        MultaDao.getMultaById(idMulta).then(({ data: { multa } }) => {
-            let targheUtente = req.targhe;
-            let targaMulta = multa.get('targa');
-            if (!targheUtente.includes(targaMulta))
-                res.status(403).send({ "error": "La multa relativa all'id fornito non appartiene a nessuna delle targhe dell'utente." });
-            else if (multa.get('pagato'))
-                res.status(403).send({ "error": "La multa relativa all'id fornito è già stata pagata." });
-            else MultaDao.pagaMulta(idMulta).then(() => res.send("Pagamento eseguito"));
-        })
+        let data = await MultaDao.getMultaById(idMulta);
+        let multa = data.dataValues;
+        let targheUtente = req.targhe;
+        let targaMulta = multa.targa;
+        if (!targheUtente.includes(targaMulta))
+            return res.status(403).send({ "error": "La multa relativa all'id fornito non appartiene a nessuna delle targhe dell'utente." });
+        else if (multa.get('pagato'))
+            return res.status(403).send({ "error": "La multa relativa all'id fornito è già stata pagata." });
+        else{
+            await MultaDao.pagaMulta(idMulta);
+            return res.send("Pagamento eseguito");
+        }
     } catch (error) {
-        res.status(500).send({ "error": "Errore interno del server" });
+        return res.status(500).send({ "error": "Errore interno del server" });
     }
 });
 
