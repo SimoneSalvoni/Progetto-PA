@@ -30,10 +30,10 @@ let listaTratteId = listaTratte.map(x => x.get('idTratta'));
 
 //Qua vengono definiti i middleware da applicare alle varie rotte.
 app.use('/nuovarilevazione/:postazione', jwtCheck('smartautovelox'), checkPostazione(listaPostId), checkTimestamp, checkFile, errorHandler);
-app.use('listaveicoli/:tratta', jwtCheck("admin"), checkTratta(listaTratteId), checkDate, errorHandler);
+app.use('/listaveicoli/:tratta', jwtCheck("admin"), checkTratta(listaTratteId), checkDate, errorHandler);
 app.use('/stat/:targa/:tratta', jwtCheck("admin"), checkTratta(listaTratteId), checkTarga, errorHandler);
 app.use('/tratte', jwtCheck("admin"), errorHandler);
-app.use('multa/:targa', jwtCheck("admin"), checkTarga, errorHandler);
+app.use('/multe/:targa', jwtCheck("admin"), checkTarga, errorHandler);
 app.use('/propriemulte', jwtCheck("car-owner"), checkTarghe, errorHandler);
 app.use('/pagamento/:id_multa', jwtCheck("car-owner"), checkTarghe, errorHandler)
 
@@ -62,7 +62,6 @@ app.post('/nuovarilevazione/:postazione', async (req, res) => {
         file.mv(filePath, (err) => {
             if (err) error = true;
         });
-        //SPEDISCO L'ERRORE O NO?
         if (error) return res.status(500).send({ "errore": "Errore interno del server" });
         else if (req.fileType == 'image') {
             let result = await Tesseract.recognize(filePath, 'eng');
@@ -117,8 +116,7 @@ app.post('/nuovarilevazione/:postazione', async (req, res) => {
                 }
                 //si moltiplica per 3.600.000 per averlo in km/h
                 if (timestampInizio === timestampFine) {
-                    logError(`ERRORE:RILEVATO TRANSITO DI AUTOVETTURA AD INIZIO E FINE TRATTA\
-                        CON LO STESSO TIMESTAMP. Postazione: ${postId}. Tratta: ${trattaId}. Timestamp: ${timestamp}`)
+                    logError(`ERRORE:RILEVATO TRANSITO DI AUTOVETTURA AD INIZIO E FINE TRATTA CON LO STESSO TIMESTAMP. Postazione: ${postId}. Tratta: ${trattaId}. Timestamp: ${timestamp}`)
                     return res.sendStatus(200);
                 }
                 let vel = ((distanza) / ((timestampFine - timestampInizio))) * 3600000;
@@ -128,12 +126,13 @@ app.post('/nuovarilevazione/:postazione', async (req, res) => {
                     else if (vel - limite < 40) importo = 2;
                     else if (vel - limite < 60) importo = 4;
                     else importo = 8;
-
+                    let data = await MultaDao.getMulteRecenti(targa, timestampFine);
+                    if (data.length !== 0) importo = importo * 1.5;
                     await TransitoDao.chiudiTransito(transitoAperto.idTransito, vel, timestampFine);
-                    await MultaDao.creaMulta(targa, importo);
+                    await MultaDao.creaMulta(targa, importo, timestampFine);
                     return res.sendStatus(200);
                 }
-                else{
+                else {
                     await TransitoDao.chiudiTransito(transitoAperto.idTransito, vel, timestampFine);
                     return res.sendStatus(200);
                 }
@@ -169,27 +168,35 @@ app.get('/listaveicoli/:tratta', async (req, res) => {
     let timestampInizio = parseInt(req.timestampInizio);
     let timestampFine = parseInt(req.timestampFine);
     try {
-        let transiti;
-        if (timestampInizio === -1) listaTransiti = await TransitoDao.getTransitiTratta(tratta);
-        else listaTransiti = await TransitoDao.getTransitiTrattaData(tratta, timestampInizio, timestampFine);
+        let data;
+        if (timestampInizio === -1) data = await TransitoDao.getTransitiTratta(tratta);
+        else data = await TransitoDao.getTransitiTrattaData(tratta, timestampInizio, timestampFine);
+        let listaTransiti = data.map(x => x.dataValues);
         let numeroTransiti = listaTransiti.length;
+        let velMedia;
+        let velMax;
+        let velMin;
+        let velStd;
         if (numeroTransiti !== 0) {
-            var velocita = listaTransiti.map(x => x.vel);
-            var velMedia = velocita.reduce((prec, succ) => prec + succ, 0) / numeroTransiti;
-            var velMax = Math.max(...velocita);
-            var velMin = Math.min(...velocita);
-            var velStd = Math.sqrt(velocita.map(x => Math.pow(x - velMedia, 2)).reduce((a, b) => a + b) / numeroTransiti);
+            //x.velMedia È FLOAT NEL DB MA QUA ARRIVA STRINGA PER QUALCHE MOTIVO
+            let velocita = listaTransiti.map(x => parseFloat(x.velMedia));
+            velMedia = velocita.reduce((prec, succ) => prec + succ, 0) / numeroTransiti;
+            velMax = Math.max(...velocita);
+            velMin = Math.min(...velocita);
+            velStd = Math.sqrt(velocita.map(x => Math.pow(x - velMedia, 2)).reduce((a, b) => a + b) / numeroTransiti);
         }
         else {
-            var velMedia = 0;
-            var velMax = 0;
-            var velMin = 0;
-            var velStd = 0;
+            velMedia = 0;
+            velMax = 0;
+            velMin = 0;
+            velStd = 0;
         }
-        let response = JSON.stringify({ transiti: listaTransiti, stat: { media: velMedia, max: velMax, min: velMin, std: velStd } });
+        //let response = JSON.stringify({ transiti: listaTransiti, stat: { media: velMedia, max: velMax, min: velMin, std: velStd } });
+        let response = { veicoli_transitati: listaTransiti.map(x => x.targa), stat: { velocità_media: velMedia, velocità_max: velMax, velocità_min: velMin, deviazione_standard: velStd } };
         return res.send(response)
     }
     catch (err) {
+        console.log(err)
         return res.status(500).send({ "error": "Errore interno del server" });
     }
 });
@@ -198,28 +205,29 @@ app.get('/listaveicoli/:tratta', async (req, res) => {
 Questa è la definizione della rotta /stat/:targa/:tratta, che serve ad un utente di tipo admin per richiedere le statitiche
 riguardanti i viaggi di una particolare targa su una particolare targa
 */
-app.get('/stat/:targa/:tratta', (req, res) => {
+app.get('/stat/:targa/:tratta', async (req, res) => {
     let tratta = parseInt(req.params.tratta);
-    let targa = req.targa;
+    let targa = req.params.targa;
     try {
-        TransitoDao.getTransitiTarga(tratta, targa).then(({ data: { listaTransiti } }) => {
-            let numeroTransiti = listaTransiti.length;
-            if (numeroTransiti === 0) {
-                return res.send("L'autovettura con la targa richiesta non ha mai attraversato la tratta");
-            }
-            else {
-                var velocita = listaTransiti.map(x => x.get('velMedia'));
-                var velMedia = velocita.reduce((prec, succ) => prec + succ, 0) / numeroTransiti;
-                var velMax = Math.max(...velocita);
-                var velMin = Math.min(...velocita);
-                var velStd = Math.sqrt(velocita.map(x => Math.pow(x - velMedia, 2)).reduce((a, b) => a + b) / numeroTransiti);
-                let response = JSON.stringify({ stat: { media: velMedia, max: velMax, min: velMin, std: velStd } });
-                return res.send(response)
-            }
-        })
+        let data = await TransitoDao.getTransitiTarga(tratta, targa);
+        let listaTransiti = data.map(x => x.dataValues);
+        let numeroTransiti = listaTransiti.length;
+        if (numeroTransiti === 0) {
+            return res.send("L'autovettura con la targa richiesta non ha mai attraversato la tratta");
+        }
+        else {
+            var velocita = listaTransiti.map(x => parseFloat(x.velMedia));
+            var velMedia = velocita.reduce((prec, succ) => prec + succ, 0) / numeroTransiti;
+            var velMax = Math.max(...velocita);
+            var velMin = Math.min(...velocita);
+            var velStd = Math.sqrt(velocita.map(x => Math.pow(x - velMedia, 2)).reduce((a, b) => a + b) / numeroTransiti);
+            let response = { stat: { media: velMedia, max: velMax, min: velMin, std: velStd } };
+            return res.send(response)
+        }
     }
     catch (err) {
-       return  res.status(500).send({ "error": "Errore interno del server" });
+        console.log(err)
+        return res.status(500).send({ "error": "Errore interno del server" });
     }
 });
 
@@ -243,14 +251,19 @@ app.get("/tratte", (req, res) => {
 });
 
 /*
-Questa è la definizione della rotta /multa/:targa, che permette ad un utente admin di ottenere la lista di tutte le multe 
+Questa è la definizione della rotta /multe/:targa, che permette ad un utente admin di ottenere la lista di tutte le multe 
 relative ad una particolare targa.
 */
-app.get("/multa/:targa", async (req, res) => {
+app.get("/multe/:targa", async (req, res) => {
     let targa = req.params.targa;
     try {
         let data = await MultaDao.getMulte(targa);
-        let listaMulte = data.dataValues;
+        let listaMulte;
+        let d = new Date();
+        if (data.length === 0) listaMulte = [];
+        else listaMulte = data.map(x => x.dataValues).map(y => {
+            return { importo: parseFloat(y.importo), data: (new Date(parseInt(y.timestamp))).toDateString(), pagato: y.pagato }
+        });
         let response = { targa: targa, multe: listaMulte };
         return res.send(response);
     }
@@ -266,7 +279,7 @@ attualmente da pagare.
 app.get('/multeaperte', async (req, res) => {
     try {
         let data = await MultaDao.getMulteDaPagare();
-        let listaMulte=data.dataValues;
+        let listaMulte = data.dataValues;
         let response = { multe: listaMulte };
         return res.send(response);
     }
@@ -278,7 +291,6 @@ app.get('/multeaperte', async (req, res) => {
 /*
 Questa funzione definisce la rotta /propriemulte, con cui un utente car-owner può controllare le proprie multe
 */
-//MODIFICA PER AVERE SOLO UNA TARGA COME ARGOMENTO DI GETMULTE
 app.get('/propriemulte', async (req, res) => {
     try {
         let listaMulte;
@@ -311,7 +323,7 @@ app.patch("/pagamento/:idMulta", async (req, res) => {
             return res.status(403).send({ "error": "La multa relativa all'id fornito non appartiene a nessuna delle targhe dell'utente." });
         else if (multa.get('pagato'))
             return res.status(403).send({ "error": "La multa relativa all'id fornito è già stata pagata." });
-        else{
+        else {
             await MultaDao.pagaMulta(idMulta);
             return res.send("Pagamento eseguito");
         }

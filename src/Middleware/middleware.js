@@ -1,7 +1,9 @@
 //Questo modulo contiene i middleware che vengono utilizzati dalle varie rotte dell'applicazione, definite in index.js.
 
 import jwt from 'jsonwebtoken';
+import pkg from 'jsonwebtoken'
 const { verify } = jwt;
+const {JsonWebTokenError} = pkg;
 /*
 Questa funzione è il middleware che controlla il jwt, che deve essere passato con la richiesta. 
 Controlla prima di tutto la sua presenza,e successivamente controlla che corrisponda al ruolo 
@@ -21,14 +23,15 @@ export function jwtCheck(role) {
                     next();
                 }
                 else {
-                    res.sendStatus(403);
+                    res.status(403).send("L'utente non è del ruolo corretto");
                 }
             } else {
-                res.sendStatus(403);
+                res.status(403).send("Token jwt mancante");
             }
         }
         catch (err) {
-            next(err)
+            if (err instanceof JsonWebTokenError) res.status(403).send(err.message)
+            else next(err)
         }
     }
 }
@@ -117,33 +120,35 @@ Queste date devono essere strettamente della forma anno-mese-giorno. Per esempio
 */
 export function checkDate(req, res, next) {
     try {
-        if ((!req.headers.hasOwnProperty('inizio') && req.hasOwnProperty('fine')) || (req.hasOwnProperty('inizio') && !req.hasOwnProperty('fine'))) {
+        if ((!req.headers.hasOwnProperty('inizio') && req.headers.hasOwnProperty('fine')) || (req.headers.hasOwnProperty('inizio') && !req.headers.hasOwnProperty('fine'))) {
             let err = new Error("Una delle due date risulta assente");
             res.status(400).send({ error: err.message });
         }
-        if (!req.headers.hasOwnProperty('inizio') && !req.hasOwnProperty('fine')) {
+        else if (!req.headers.hasOwnProperty('inizio') && !req.headers.hasOwnProperty('fine')) {
             req.timestampInizio = -1;
             req.timestampFine = -1;
             next();
         }
-        const dataInizio = req.inizio;
-        const dataFine = req.fine;
-        let regex = new RegExp("^[0-9]{4}-[0-9]{2}-[0-9]{2}$");
-        if (!regex.test(dataInizio) || !regex.test(dataFine)) {
-            let err = new Error("Almeno una delle date risulta mal formattata");
-            res.status(422).send({ error: err.message });
+        else{
+            const dataInizio = req.headers.inizio;
+            const dataFine = req.headers.fine;
+            let regex = new RegExp("^[0-9]{4}-[0-9]{2}-[0-9]{2}$");
+            if (!regex.test(dataInizio) || !regex.test(dataFine)) {
+                let err = new Error("Almeno una delle date risulta mal formattata");
+                res.status(422).send({ error: err.message });
+            }
+            const dataInizioObject = new Date(dataInizio);
+            const dataFineObject = new Date(dataFine);
+            if (dataInizioObject.toString() === 'Invalid Date' || dataFineObject.toString() === 'Invalid Date') {
+                let err = new Error("Almeno una delle date risulta mal formattata");
+                res.status(422).send({ error: err.message });
+            }
+            const dataInizioTimestamp = dataInizioObject.getTime();
+            const dataFineTimestamp = dataFineObject.getTime();
+            req.timestampInizio = dataInizioTimestamp;
+            req.timestampFine = dataFineTimestamp;
+            next();
         }
-        const dataInizioObject = new Date(dataInizio);
-        const dataFineObject = new Date(dataFine);
-        if (dataInizioObject.toString() === 'Invalid Date' || dataFineObject.toString() === 'Invalid Date') {
-            let err = new Error("Almeno una delle date risulta mal formattata");
-            res.status(422).send({ error: err.message });
-        }
-        const dataInizioTimestamp = dataInizioObject.getTime();
-        const dataFineTimestamp = dataFineObject.getTime();
-        req.timestampInizio = dataInizioTimestamp;
-        req.timestampFine = dataFineTimestamp;
-        next();
     }
     catch (err) {
         next(err)
@@ -155,6 +160,7 @@ Questa funzione è il middleware che controlla che sia presente un file allegato
 */
 export function checkFile(req, res, next) {
     try {
+        console.log(req.files)
         if (!req.files || Object.keys(req.files).length === 0) {
             let err = new Error("Nessun file presente");
             res.status(422).send({ error: err.message });
@@ -215,7 +221,8 @@ export function checkTarga(req, res, next) {
         res.status(400).send({ error: err.message });
     }
     let targa = req.params.targa;
-    if (typeof (targa) !== "string" || targa === '' || !targa.test("^[A-Z0-9]{7}$")) {
+    let regex = new RegExp("^[A-Z0-9]{7}$");
+    if (typeof (targa) !== "string" || targa === '' || !regex.test(targa)) {
         let err = new Error("Targa invalida")
         res.status(422).send({ error: err.message });
     }

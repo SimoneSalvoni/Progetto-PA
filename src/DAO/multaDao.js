@@ -1,4 +1,5 @@
 import {Multa} from '../Models/multa.js';
+import {Op} from 'sequelize';
 
 export var MultaDao = {
   getMulteDaPagare: getMulteDaPagare,
@@ -22,10 +23,12 @@ function getMulteDaPagare() {
 
 async function getMulteRecenti(targa, timestamp) {
  
-  return await Transito.findAll({
+  return await Multa.findAll({
     where:
     {
-      timestamp: $between[timestamp - 2592000000, timestamp - 1],
+      timestamp: {
+        [Op.between]: [timestamp - 2592000000, timestamp - 1]
+      },
       targa: targa
     }
   });

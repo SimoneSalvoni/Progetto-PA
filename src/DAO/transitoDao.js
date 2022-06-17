@@ -1,4 +1,5 @@
 import { Transito } from "../Models/transito.js";
+import { Op } from 'sequelize';
 
 export var TransitoDao = {
   getTransitiTratta: getTransitiTratta,
@@ -28,13 +29,14 @@ async function ricercaTransitoAperto(targa, tratta) {
 }
 
 
-//vengono restituiti tutti i transiti su una specifica tratta
+//vengono restituiti tutti i transiti completati su una specifica tratta
 async function getTransitiTratta(id) {
 
   return await Transito.findAll({
     where:
     {
-      tratta: id
+      tratta: id,
+      aperto: false
     }
   });
 }
@@ -45,17 +47,20 @@ async function getTransitiTrattaData(id, startDate, endDate) {
   return await Transito.findAll({
     where:
     {
-      tempofin: $between[startDate, endDate],
-      tratta: id
+      timestampFine: {
+        [Op.between]: [startDate, endDate]
+      },
+      tratta: id,
+      aperto: false
     }
   });
 }
 
 //vengono restituiti tutti i transiti di uno specifico veicolo su una specifica tratta
-function getTransitiTarga(tratta, targa) {
+async function getTransitiTarga(tratta, targa) {
 
-  return Transito.findAll({
-    where: { tratta: tratta, targa: targa }
+  return await Transito.findAll({
+    where: { tratta: tratta, targa: targa, aperto:false }
   });
 }
 
@@ -66,7 +71,7 @@ function deleteById(id) {
 
 //vengono eliminati tutti i transiti aperti più vecchi di 2 ore
 function eliminaTransitiErrati(date) {
-  return Transito.destroy({ where: { tempoiniz: $lt[date - 7200000], aperto: true } });
+  return Transito.destroy({ where: { tempoiniz: { [Op.lt]: [date - 7200000] }, aperto: true } });
 }
 
 
