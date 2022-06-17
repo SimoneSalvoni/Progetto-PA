@@ -24,6 +24,7 @@ CREATE TABLE Multa (
 idMulta INTEGER AUTO_INCREMENT PRIMARY KEY,
 importo NUMERIC(4,2),
 targa VARCHAR(7),
+timestamp VARCHAR(20),
 pagato BOOLEAN
 );
 INSERT INTO Tratta (limite, distanza) VALUES

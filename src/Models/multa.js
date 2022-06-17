@@ -9,6 +9,7 @@ export const Multa = db.define('postazioni', {
 	},
 	importo: Sequelize.INTEGER,
 	targa: Sequelize.STRING(7),
+	timestamp: Sequelize.STRING(7),
 	pagato: Sequelize.BOOLEAN
 },
 	{

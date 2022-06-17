@@ -65,7 +65,6 @@ app.post('/nuovarilevazione/:postazione', async (req, res) => {
         //SPEDISCO L'ERRORE O NO?
         if (error) return res.status(500).send({ "errore": "Errore interno del server" });
         else if (req.fileType == 'image') {
-            //scansioneImmagine(filePath).then(({data:text})=>targa=text);
             let result = await Tesseract.recognize(filePath, 'eng');
             targa = result.data.text;
         }
@@ -93,7 +92,6 @@ app.post('/nuovarilevazione/:postazione', async (req, res) => {
             return res.sendStatus(200);
         }
         if (tipoPostazione === 'inizio') {
-            //await TransitoDao.aggiungiTransito(targa, trattaId, timestamp).then(() => res.sendStatus(200))
             await TransitoDao.aggiungiTransito(targa, trattaId, timestamp);
             return res.sendStatus(200);
         }
@@ -130,11 +128,7 @@ app.post('/nuovarilevazione/:postazione', async (req, res) => {
                     else if (vel - limite < 40) importo = 2;
                     else if (vel - limite < 60) importo = 4;
                     else importo = 8;
-                    /*
-                    TransitoDao.chiudiTransito(transitoAperto.idTransito, vel, timestampFine).then(() => {
-                        MultaDao.creaMulta(targa, importo).then(() => res.sendStatus(200))
-                    });
-                    */
+
                     await TransitoDao.chiudiTransito(transitoAperto.idTransito, vel, timestampFine);
                     await MultaDao.creaMulta(targa, importo);
                     return res.sendStatus(200);
@@ -142,7 +136,7 @@ app.post('/nuovarilevazione/:postazione', async (req, res) => {
                 else{
                     await TransitoDao.chiudiTransito(transitoAperto.idTransito, vel, timestampFine);
                     return res.sendStatus(200);
-                } //TransitoDao.chiudiTransito(transitoAperto.idTransito, vel, timestampFine).then(() => res.sendStatus(200));
+                }
             }
         }
     }
@@ -170,14 +164,14 @@ app.post('/nuovarilevazione/:postazione', async (req, res) => {
 Questa è la definizione della rotta /listaveicoli/:tratta, che serve ad un utente di tipo admin per richiedere una lista 
 dei veicoli transitati in una data tratta, con la possibilità di specificare un intervallo temporale, con statistiche a riguardo
 */
-app.get('/listaveicoli/:tratta', (req, res) => {
+app.get('/listaveicoli/:tratta', async (req, res) => {
     let tratta = parseInt(req.params.tratta);
     let timestampInizio = parseInt(req.timestampInizio);
     let timestampFine = parseInt(req.timestampFine);
     try {
         let transiti;
-        if (timestampInizio === -1) listaTransiti = TransitoDao.getTransitiTratta(tratta);
-        else listaTransiti = TransitoDao.getTransitiTrattaData(tratta, timestampInizio, timestampFine);
+        if (timestampInizio === -1) listaTransiti = await TransitoDao.getTransitiTratta(tratta);
+        else listaTransiti = await TransitoDao.getTransitiTrattaData(tratta, timestampInizio, timestampFine);
         let numeroTransiti = listaTransiti.length;
         if (numeroTransiti !== 0) {
             var velocita = listaTransiti.map(x => x.vel);
