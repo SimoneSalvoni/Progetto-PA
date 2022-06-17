@@ -3,6 +3,7 @@ import {Multa} from '../Models/multa.js';
 export var MultaDao = {
   getMulteDaPagare: getMulteDaPagare,
   creaMulta: creaMulta,
+  getMulteRecenti: getMulteRecenti,
   getMultaById: getMultaById,
   getMulte: getMulte,
   pagaMulta: pagaMulta
@@ -18,6 +19,18 @@ async function creaMulta(targa, importo, timestamp) {
 function getMulteDaPagare() {
   return Multa.findAll({ where: { pagato: False } });
 }
+
+async function getMulteRecenti(targa, timestamp) {
+ 
+  return await Transito.findAll({
+    where:
+    {
+      timestamp: $between[timestamp - 2592000000, timestamp - 1],
+      targa: targa
+    }
+  });
+}
+
 
 //si ricerca una specifica multa a partire dal suo id
 function getMultaById(id) {
