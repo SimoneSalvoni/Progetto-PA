@@ -1,8 +1,8 @@
 import 'dotenv/config';
 import express from 'express';
 import fileUpload from 'express-fileupload';
-import { db } from './Connection/connect.js'
-import { unlink, createWriteStream } from 'fs'
+import { db } from './Connection/connect.js';
+import { unlink, createWriteStream, readFileSync} from 'fs';
 import Tesseract from 'tesseract.js';
 import { MultaDao } from './DAO/multaDao.js';
 import { PostazioneDao } from './DAO/postazioneDao.js';
@@ -22,6 +22,8 @@ app.use(fileUpload());
 const PORT = process.env.PORT || 3000;
 const HOST = process.env.HOST || 'localhost';
 
+//Viene fatta una prima chiamata al DB, con cui si prendono postazioni e tratte. Dato che il numero sarà verosimilmente sempre 
+//relativamente limitato, lo si preferisce a chiamare il DB ogni volta che sono necessarie delle informazioni a riguardo
 let listaPost = await PostazioneDao.getPostazioni();
 let listaPostId = listaPost.map(x => x.get('idPostazione'));
 let listaTratte = await TrattaDao.getTratte();
@@ -34,8 +36,9 @@ app.use('/listaveicoli/:tratta', jwtCheck("admin"), checkTratta(listaTratteId), 
 app.use('/stat/:targa/:tratta', jwtCheck("admin"), checkTratta(listaTratteId), checkTarga, errorHandler);
 app.use('/tratte', jwtCheck("admin"), errorHandler);
 app.use('/multe/:targa', jwtCheck("admin"), checkTarga, errorHandler);
+app.use('/multeaperte', jwtCheck('admin'), errorHandler);
 app.use('/propriemulte', jwtCheck("car-owner"), checkTarghe, errorHandler);
-app.use('/pagamento/:id_multa', jwtCheck("car-owner"), checkTarghe, errorHandler)
+app.use('/pagamento/:idMulta', jwtCheck("car-owner"), checkTarghe, errorHandler)
 
 /*
 Questa funzione gestisce il log di due situazioni anomale: l'incapacità di Tesseract di estrarre una targa valida da un'immagine
@@ -58,25 +61,31 @@ app.post('/nuovarilevazione/:postazione', async (req, res) => {
         let file = req.files.file;
         let targa;
         var filePath = '../tmp/' + file.name;
-        let error = false;
-        file.mv(filePath, (err) => {
-            if (err) error = true;
-        });
-        if (error) return res.status(500).send({ "errore": "Errore interno del server" });
+        //Il file è salvato, dato che Tesseract richiede come parametro il path del file.
+        let error=await file.mv(filePath);
+        if (error) {
+            logError(error.message);
+            return res.status(500).send({ "errore": "Errore interno del server" });
+        }
         else if (req.fileType == 'image') {
+            //Lettura della targa tramite Tesseract se il file è un'immagine
             let result = await Tesseract.recognize(filePath, 'eng');
             targa = result.data.text;
         }
         else {
-            let jsonFile = require(filePath);
+            //Lettura da file JSON
+            let jsonFile=JSON.parse(readFileSync(filePath, 'utf8'))
             if (!jsonFile.targa) return res.status(400).send({ 'errore': 'Targa mancante nel file JSON' });
             targa = jsonFile.targa;
         }
         let postId = parseInt(req.params.postazione);
+        //Si sono notati due errori che Tesseract compie nella scrittura: l'aggiunta di un trattino (presumibilmente è il simbolo
+        //della repubblica a confonderlo) e inserire un \n alla fine della stringa. Questi vengono rimosssi manualamente. 
         targa = targa.replace('-', '');
         targa = targa.replace('\n', '');
         let trattaId;
         let tipoPostazione;
+        //Si ricerca l'id della tratta relativa alla postazione che ha spedito la targa, e se questa è di inizio o fine tratta
         for (let post of listaPost) {
             if (post.get('idPostazione') === postId) {
                 trattaId = post.get('idTratta');
@@ -87,26 +96,29 @@ app.post('/nuovarilevazione/:postazione', async (req, res) => {
         let timestamp = parseInt(req.headers.timestamp);
         let regex = new RegExp('^[A-Z0-9]{7}$');
         if (typeof (targa) !== "string" || targa === '' || !regex.test(targa)) {
-            logError(`ERRORE:TARGA ILLEGGIBILE. Postazione: ${postId}. Tratta: ${trattaId}. Timestamp: ${timestamp}`);
-            return res.sendStatus(200);
+            logError(`ERRORE:TARGA INVALIDA. Postazione: ${postId}. Tratta: ${trattaId}. Timestamp: ${timestamp}`);
+            return res.sendStatus(400);
         }
         if (tipoPostazione === 'inizio') {
+            //Se è una postazione di inizio si apre un nuovo transito
             await TransitoDao.aggiungiTransito(targa, trattaId, timestamp);
             return res.sendStatus(200);
         }
         else {
+            //Se è una postazione di fine si ricerca un transito aperto dalla stessa targa sulla stessa tratta per chiuderlo
             let data = await TransitoDao.ricercaTransitoAperto(targa, trattaId);
             let transitoAperto = data.dataValues;
             if (!transitoAperto) {
                 logError(`ERRORE:RILEVATO TRANSITO DI AUTOVETTURA ALLA FINE DI UN TRATTO SENZA LA PRECEDENTE RILEVAZIONE DI\
                 ENTRATA NEL TRATTO. Postazione: ${postId}. Tratta: ${trattaId}. Timestamp: ${timestamp}`);
-                return res.sendStatus(200); //FORSE MEGLIO NON OK
+                return res.sendStatus(400);
             }
             else {
                 let timestampInizio = parseInt(transitoAperto.timestampInizio);
                 let timestampFine = timestamp;
                 let distanza;
                 let limite;
+                //Si recuperano distanza e limite della tratta
                 for (let tratta of listaTratte) {
                     if (tratta.get('idTratta') === trattaId) {
                         distanza = tratta.get('distanza');
@@ -114,13 +126,14 @@ app.post('/nuovarilevazione/:postazione', async (req, res) => {
                         break;
                     }
                 }
-                //si moltiplica per 3.600.000 per averlo in km/h
                 if (timestampInizio === timestampFine) {
                     logError(`ERRORE:RILEVATO TRANSITO DI AUTOVETTURA AD INIZIO E FINE TRATTA CON LO STESSO TIMESTAMP. Postazione: ${postId}. Tratta: ${trattaId}. Timestamp: ${timestamp}`)
-                    return res.sendStatus(200);
+                    return res.sendStatus(400);
                 }
+                //Nel calcolo della velocità si moltiplica per 3.600.000 per averlo in km/h
                 let vel = ((distanza) / ((timestampFine - timestampInizio))) * 3600000;
                 if (vel > limite) {
+                    //Se la velocità supera il limite si crea la multa dopo aver chiuso il transito
                     let importo;
                     if ((vel - limite < 10)) importo = 1;
                     else if (vel - limite < 40) importo = 2;
@@ -140,7 +153,7 @@ app.post('/nuovarilevazione/:postazione', async (req, res) => {
         }
     }
     catch (err) {
-        console.log(err)
+        logError(err.message);
         return res.status(500).send({ "errore": "Errore interno del server" });
     }
     finally {
@@ -154,7 +167,7 @@ app.post('/nuovarilevazione/:postazione', async (req, res) => {
         try {
             unlink(filePath, () => { });
         } catch (error) {
-            console.error('Errore durante la cancellazione del file:', error.message);
+            logError('Errore durante la cancellazione del file:', error.message);
         }
     }
 })
@@ -169,34 +182,28 @@ app.get('/listaveicoli/:tratta', async (req, res) => {
     let timestampFine = parseInt(req.timestampFine);
     try {
         let data;
+        //I timestamp sono posti a -1 dal middleware se assenti nell'header della richiesta
         if (timestampInizio === -1) data = await TransitoDao.getTransitiTratta(tratta);
         else data = await TransitoDao.getTransitiTrattaData(tratta, timestampInizio, timestampFine);
         let listaTransiti = data.map(x => x.dataValues);
         let numeroTransiti = listaTransiti.length;
-        let velMedia;
-        let velMax;
-        let velMin;
-        let velStd;
+        let velMedia=0;
+        let velMax=0;
+        let velMin=0;
+        let velStd=0;
         if (numeroTransiti !== 0) {
-            //x.velMedia È FLOAT NEL DB MA QUA ARRIVA STRINGA PER QUALCHE MOTIVO
+            //x.velMedia è salvata come numeric sul db, ma viene restituita come stringa per qualche motivo. La passiamo in parseFloat
             let velocita = listaTransiti.map(x => parseFloat(x.velMedia));
             velMedia = velocita.reduce((prec, succ) => prec + succ, 0) / numeroTransiti;
             velMax = Math.max(...velocita);
             velMin = Math.min(...velocita);
             velStd = Math.sqrt(velocita.map(x => Math.pow(x - velMedia, 2)).reduce((a, b) => a + b) / numeroTransiti);
         }
-        else {
-            velMedia = 0;
-            velMax = 0;
-            velMin = 0;
-            velStd = 0;
-        }
-        //let response = JSON.stringify({ transiti: listaTransiti, stat: { media: velMedia, max: velMax, min: velMin, std: velStd } });
         let response = { veicoli_transitati: listaTransiti.map(x => x.targa), stat: { velocità_media: velMedia, velocità_max: velMax, velocità_min: velMin, deviazione_standard: velStd } };
         return res.send(response)
     }
     catch (err) {
-        console.log(err)
+        logError(err.message);
         return res.status(500).send({ "error": "Errore interno del server" });
     }
 });
@@ -226,7 +233,7 @@ app.get('/stat/:targa/:tratta', async (req, res) => {
         }
     }
     catch (err) {
-        console.log(err)
+        logError(err.message);
         return res.status(500).send({ "error": "Errore interno del server" });
     }
 });
@@ -268,6 +275,7 @@ app.get("/multe/:targa", async (req, res) => {
         return res.send(response);
     }
     catch (err) {
+        logError(err.message);
         return res.status(500).send({ "error": "Errore interno del server" });
     }
 })
@@ -279,11 +287,16 @@ attualmente da pagare.
 app.get('/multeaperte', async (req, res) => {
     try {
         let data = await MultaDao.getMulteDaPagare();
-        let listaMulte = data.dataValues;
-        let response = { multe: listaMulte };
+        let listaMulte;
+        if (data.length === 0) listaMulte = [];
+        else listaMulte = data.map(x => x.dataValues).map(y => {
+            return { targa: y.targa, importo: parseFloat(y.importo), data: (new Date(parseInt(y.timestamp))).toDateString() }
+        });
+        let response = { multe_da_pagare: listaMulte };
         return res.send(response);
     }
     catch (err) {
+        logError(err.message);
         return res.status(500).send({ "error": "Errore interno del server" });
     }
 })
@@ -293,14 +306,29 @@ Questa funzione definisce la rotta /propriemulte, con cui un utente car-owner pu
 */
 app.get('/propriemulte', async (req, res) => {
     try {
-        let listaMulte;
-        for (let targa of req.targhe) {
-            let data = await MultaDao.getMulte(targa);
-            listaMulte = listaMulte.concat(data.dataValues);
+        let listaMulte = [];
+        //se è valorizzato req.targa il jwt ha solo una stringa, se è valorizzato req.targhe ha un array di stringhe
+        if (req.targa) {
+            let data = await MultaDao.getMulte(req.targa);
+            listaMulte = listaMulte.concat(data.map(x => x.dataValues));
         }
-        let response = { multe: listaMulte };
+        else if (req.targhe) {
+            for (let targa of req.targhe) {
+                let data = await MultaDao.getMulte(targa);
+                listaMulte = listaMulte.concat(data.map(x => x.dataValues));
+            }
+        }
+        let response = {
+            multe: listaMulte.map(y => {
+                return {
+                    id_multa: y.idMulta, targa: y.targa, importo: parseFloat(y.importo),
+                    data: (new Date(parseInt(y.timestamp))).toDateString(), pagato: y.pagato
+                }
+            })
+        };
         return res.send(response);
-    } catch (error) {
+    } catch (err) {
+        logError(err.message);
         return res.status(500).send({ "error": "Errore interno del server" });
     }
 })
@@ -317,30 +345,42 @@ app.patch("/pagamento/:idMulta", async (req, res) => {
     try {
         let data = await MultaDao.getMultaById(idMulta);
         let multa = data.dataValues;
-        let targheUtente = req.targhe;
         let targaMulta = multa.targa;
-        if (!targheUtente.includes(targaMulta))
-            return res.status(403).send({ "error": "La multa relativa all'id fornito non appartiene a nessuna delle targhe dell'utente." });
-        else if (multa.get('pagato'))
+        //se è valorizzato req.targa il jwt ha solo una stringa, se è valorizzato req.targhe ha un array di stringhe
+        if (req.targa) {
+            let targaUtente = req.targa;
+            if (!targaUtente === targaMulta)
+                return res.status(403).send({ "error": "La multa relativa all'id fornito non appartiene a nessuna delle targhe dell'utente." });
+        }
+        else if (req.targhe) {
+            let targheUtente = req.targhe;
+            if (!targheUtente.includes(targaMulta))
+                return res.status(403).send({ "error": "La multa relativa all'id fornito non appartiene a nessuna delle targhe dell'utente." });
+        }
+
+        if (multa.pagato)
             return res.status(403).send({ "error": "La multa relativa all'id fornito è già stata pagata." });
         else {
             await MultaDao.pagaMulta(idMulta);
             return res.send("Pagamento eseguito");
         }
-    } catch (error) {
+    } catch (err) {
+        logError(err.message);
         return res.status(500).send({ "error": "Errore interno del server" });
     }
 });
 
+
 /*È possibile che venga rilevato il passaggio di un veicolo all'ingresso di una tratta ma non della fine. Per evitare di mantenere 
-transiti aperti per troppo tempo, si definisce un operazione che viene ripetuta ciclamente di pulizia del DB.
+transiti aperti per troppo tempo, nello specifico da più di due ore rispetto alla data attuale,
+si definisce un operazione di pulizia del DB che viene ripetuta ciclamente.
 */
-/*
 setInterval(() => {
+    console.log("dentro all'interval")
     let date = new Date();
     TransitoDao.eliminaTransitiErrati(date.getTime());
-}, 100000000000);
-*/
+}, 3600000);
+
 
 
 app.listen(PORT, HOST, err => {

@@ -1,9 +1,12 @@
 //Questo modulo contiene i middleware che vengono utilizzati dalle varie rotte dell'applicazione, definite in index.js.
 
 import jwt from 'jsonwebtoken';
-import pkg from 'jsonwebtoken'
+import pkg from 'jsonwebtoken';
+ //la proprietà mimetype di req.files.file, fornita da express-fileupload, per qualche motivo restituisce sempre image/jpeg. 
+ //Per questo sfruttiamo la libreria mime-types.
+import {lookup} from 'mime-types';
 const { verify } = jwt;
-const {JsonWebTokenError} = pkg;
+const { JsonWebTokenError } = pkg;
 /*
 Questa funzione è il middleware che controlla il jwt, che deve essere passato con la richiesta. 
 Controlla prima di tutto la sua presenza,e successivamente controlla che corrisponda al ruolo 
@@ -129,7 +132,7 @@ export function checkDate(req, res, next) {
             req.timestampFine = -1;
             next();
         }
-        else{
+        else {
             const dataInizio = req.headers.inizio;
             const dataFine = req.headers.fine;
             let regex = new RegExp("^[0-9]{4}-[0-9]{2}-[0-9]{2}$");
@@ -160,7 +163,6 @@ Questa funzione è il middleware che controlla che sia presente un file allegato
 */
 export function checkFile(req, res, next) {
     try {
-        console.log(req.files)
         if (!req.files || Object.keys(req.files).length === 0) {
             let err = new Error("Nessun file presente");
             res.status(422).send({ error: err.message });
@@ -169,16 +171,17 @@ export function checkFile(req, res, next) {
             let err = new Error("Solo un file è ammesso");
             res.status(422).send({ error: err.message });
         }
-        if (req.files.file.mimetype === 'application/json') {
+        let mimetype= lookup(req.files.file.name);
+        if (mimetype === 'application/json') {
             req.fileType = 'json';
             next();
         }
-        if (req.files.file.mimetype === 'image/jpeg' || req.files.file.mimetype === 'image/png') {
+        else if (mimetype === 'image/jpeg' || mimetype === 'image/png') {
             req.fileType = 'image';
             next();
         }
         else {
-            let err = new Error("Solamente file json sono ammessi");
+            let err = new Error("Solamente file jpeg, png e json sono ammessi");
             res.status(415).send({ error: err.message });
         }
     }
@@ -191,25 +194,33 @@ export function checkFile(req, res, next) {
 Questa funzione è il middleware che controlla la presenza e il formato delle targhe all'interno del jwt
 */
 export function checkTarghe(req, res, next) {
-    if (!req.token.hasOwnProperty('targhe')) {
+    if (!req.token.hasOwnProperty('Targhe')) {
         let err = new Error("Targhe non presenti");
         res.status(400).send({ error: err.message });
     }
-    let targhe = req.token.targhe;
-    let flag = false;
+    let targhe = req.token.Targhe;
     let regex = new RegExp("^[A-Z0-9]{7}$");
-    for (let targa in targhe) {
-        if (typeof (targa) !== "string" || targa === '' || !regex.test(targa)) flag = true;
+    //se nel jwt per il campo Targhe c'è una sola targa è passata una stringa, altrimenti è passato un array 
+    if (typeof (targhe) === 'string' && regex.test(targhe)) {
+        req.targa = targhe;
+        next();
     }
-    if (flag) {
+    else if (typeof (targhe) === 'object') {
+        for (let targa of targhe) {
+            if (typeof (targa) !== 'string' && !regex.test(targa)) {
+                let err = new Error("Una o più targhe invalide")
+                return res.status(422).send({ error: err.message });
+            }
+        }
+        req.targhe = targhe
+        next();
+    }
+    else {
         let err = new Error("Una o più targhe invalide")
         res.status(422).send({ error: err.message });
     }
-    else {
-        req.targhe = targhe;
-        next();
-    }
 }
+
 
 /*
 Questa funzione è il middleware che controlla la presenza e il formato della targa passata dall'utente admin 
@@ -229,9 +240,10 @@ export function checkTarga(req, res, next) {
     else next();
 }
 
+
 /*
 Questo middleware parte nel caso in cui i precedenti trovino una situazione di errore generica.
-Viene fornito a chi ha chiamato la rotta erronamente una risposta con un HTTP status 500 e un messaggio d'errore.
+Viene fornita una risposta con un HTTP status 500 e un messaggio d'errore.
 */
 export function errorHandler(err, req, res, next) {
     res.status(500).send({ error: err.message });

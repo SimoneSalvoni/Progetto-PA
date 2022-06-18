@@ -71,7 +71,7 @@ function deleteById(id) {
 
 //vengono eliminati tutti i transiti aperti più vecchi di 2 ore
 function eliminaTransitiErrati(date) {
-  return Transito.destroy({ where: { tempoiniz: { [Op.lt]: [date - 7200000] }, aperto: true } });
+  return Transito.destroy({ where: { timestampInizio: { [Op.lt]: [date - 7200000] }, aperto: true } });
 }
 
 

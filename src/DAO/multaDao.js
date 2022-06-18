@@ -17,8 +17,8 @@ async function creaMulta(targa, importo, timestamp) {
 }
 
 //si ricercano tutte le multe il cui campo "pagato" risulta falso
-function getMulteDaPagare() {
-  return Multa.findAll({ where: { pagato: False } });
+async function getMulteDaPagare() {
+  return await Multa.findAll({ where: { pagato: false } });
 }
 
 async function getMulteRecenti(targa, timestamp) {
@@ -36,8 +36,8 @@ async function getMulteRecenti(targa, timestamp) {
 
 
 //si ricerca una specifica multa a partire dal suo id
-function getMultaById(id) {
-  return Multa.findByPk(id);
+async function getMultaById(id) {
+  return await Multa.findByPk(id);
 }
 
 //si ricercano tutte le multe relative ad una specifica targa
@@ -48,5 +48,5 @@ async function getMulte(targa) {
 //si cambia il campo "pagato" di una specifica multa a partire dal suo id
 async function pagaMulta(id) {
   let multa = await Multa.findByPk(id);
-  if (multa) await multa.update({pagato: True})
+  if (multa) await multa.update({pagato: true})
 }
