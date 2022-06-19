@@ -2,7 +2,7 @@ import 'dotenv/config';
 import express from 'express';
 import fileUpload from 'express-fileupload';
 import { db } from './Connection/connect.js';
-import { unlink, createWriteStream, readFileSync} from 'fs';
+import { unlink, createWriteStream, readFileSync } from 'fs';
 import Tesseract from 'tesseract.js';
 import { MultaDao } from './DAO/multaDao.js';
 import { PostazioneDao } from './DAO/postazioneDao.js';
@@ -62,7 +62,7 @@ app.post('/nuovarilevazione/:postazione', async (req, res) => {
         let targa;
         var filePath = '../tmp/' + file.name;
         //Il file è salvato, dato che Tesseract richiede come parametro il path del file.
-        let error=await file.mv(filePath);
+        let error = await file.mv(filePath);
         if (error) {
             logError(error.message);
             return res.status(500).send({ "errore": "Errore interno del server" });
@@ -74,7 +74,7 @@ app.post('/nuovarilevazione/:postazione', async (req, res) => {
         }
         else {
             //Lettura da file JSON
-            let jsonFile=JSON.parse(readFileSync(filePath, 'utf8'))
+            let jsonFile = JSON.parse(readFileSync(filePath, 'utf8'))
             if (!jsonFile.targa) return res.status(400).send({ 'errore': 'Targa mancante nel file JSON' });
             targa = jsonFile.targa;
         }
@@ -187,19 +187,20 @@ app.get('/listaveicoli/:tratta', async (req, res) => {
         else data = await TransitoDao.getTransitiTrattaData(tratta, timestampInizio, timestampFine);
         let listaTransiti = data.map(x => x.dataValues);
         let numeroTransiti = listaTransiti.length;
-        let velMedia=0;
-        let velMax=0;
-        let velMin=0;
-        let velStd=0;
+        let velMedia = 0;
+        let velMax = 0;
+        let velMin = 0;
+        let velStd = 0;
         if (numeroTransiti !== 0) {
             //x.velMedia è salvata come numeric sul db, ma viene restituita come stringa per qualche motivo. La passiamo in parseFloat
             let velocita = listaTransiti.map(x => parseFloat(x.velMedia));
             velMedia = velocita.reduce((prec, succ) => prec + succ, 0) / numeroTransiti;
             velMax = Math.max(...velocita);
             velMin = Math.min(...velocita);
-            velStd = Math.sqrt(velocita.map(x => Math.pow(x - velMedia, 2)).reduce((a, b) => a + b) / numeroTransiti);
+            //Uso il + e toFixed per forzare due cifre decimali al massimo, ma non forzarne due quando non serve
+            velStd = +(Math.sqrt(velocita.map(x => Math.pow(x - velMedia, 2)).reduce((a, b) => a + b) / numeroTransiti)).toFixed(2);
         }
-        let response = { veicoli_transitati: listaTransiti.map(x => x.targa), stat: { velocità_media: velMedia, velocità_max: velMax, velocità_min: velMin, deviazione_standard: velStd } };
+        let response = { veicoli_transitati: listaTransiti.map(x => x.targa), statistiche: { velocità_media: velMedia, velocità_max: velMax, velocità_min: velMin, deviazione_standard: velStd } };
         return res.send(response)
     }
     catch (err) {
@@ -223,12 +224,12 @@ app.get('/stat/:targa/:tratta', async (req, res) => {
             return res.send("L'autovettura con la targa richiesta non ha mai attraversato la tratta");
         }
         else {
-            var velocita = listaTransiti.map(x => parseFloat(x.velMedia));
-            var velMedia = velocita.reduce((prec, succ) => prec + succ, 0) / numeroTransiti;
-            var velMax = Math.max(...velocita);
-            var velMin = Math.min(...velocita);
-            var velStd = Math.sqrt(velocita.map(x => Math.pow(x - velMedia, 2)).reduce((a, b) => a + b) / numeroTransiti);
-            let response = { stat: { media: velMedia, max: velMax, min: velMin, std: velStd } };
+            let velocita = listaTransiti.map(x => parseFloat(x.velMedia));
+            let velMedia = velocita.reduce((prec, succ) => prec + succ, 0) / numeroTransiti;
+            let velMax = Math.max(...velocita);
+            let velMin = Math.min(...velocita);
+            let velStd = +(Math.sqrt(velocita.map(x => Math.pow(x - velMedia, 2)).reduce((a, b) => a + b) / numeroTransiti)).toFixed(2);
+            let response = { statistiche: { velocità_media: velMedia, velocità_max: velMax, velocità_min: velMin, deviazione_standard: velStd } };
             return res.send(response)
         }
     }
