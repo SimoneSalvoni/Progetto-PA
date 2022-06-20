@@ -20,7 +20,7 @@ let app = express();
 app.use(fileUpload());
 
 const PORT = process.env.PORT || 3000;
-const HOST = process.env.HOST || 'localhost';
+const HOST = process.env.HOST || '0.0.0.0';
 
 //Viene fatta una prima chiamata al DB, con cui si prendono postazioni e tratte. Dato che il numero sarà verosimilmente sempre 
 //relativamente limitato, lo si preferisce a chiamare il DB ogni volta che sono necessarie delle informazioni a riguardo
