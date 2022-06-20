@@ -1,17 +1,16 @@
-﻿DROP DATABASE IF EXISTS Rilevazioni;
-CREATE DATABASE Rilevazioni;
+﻿CREATE DATABASE IF NOT EXISTS Rilevazioni;
 USE Rilevazioni;
-CREATE TABLE Tratta (
+CREATE TABLE IF NOT EXISTS Tratta (
 idTratta INTEGER AUTO_INCREMENT PRIMARY KEY, 
 limite INTEGER, 
 distanza INTEGER
 );
-CREATE TABLE Postazione (
+CREATE TABLE IF NOT EXISTS Postazione (
 idPostazione INTEGER AUTO_INCREMENT PRIMARY KEY, 
 tipo VARCHAR(6), 
 idTratta INTEGER REFERENCES Tratta (idTratta)
 );
-CREATE TABLE Transito (
+CREATE TABLE IF NOT EXISTS Transito (
 idTransito INTEGER AUTO_INCREMENT PRIMARY KEY,
 aperto BOOLEAN,
 timestampInizio VARCHAR(20),
@@ -20,20 +19,20 @@ velMedia NUMERIC(6 , 2 ),
 targa VARCHAR(7),
 tratta INTEGER REFERENCES Tratta (idTratta)
 );
-CREATE TABLE Multa (
+CREATE TABLE IF NOT EXISTS Multa (
 idMulta INTEGER AUTO_INCREMENT PRIMARY KEY,
 importo NUMERIC(4,2),
 targa VARCHAR(7),
 timestamp VARCHAR(20),
 pagato BOOLEAN
 );
-INSERT INTO Tratta (limite, distanza) VALUES
+IF ((SELECT COUNT(*) FROM Tratta)=0) INSERT INTO Tratta (limite, distanza) VALUES
 (70, 20),
 (50, 10),
 (40, 5),
 (90, 30),
 (110, 50);
-INSERT INTO Postazione (tipo, idTratta) VALUES
+IF ((SELECT COUNT(*) FROM Postazione)=0) INSERT INTO Postazione (tipo, idTratta) VALUES
 ('inizio', 1),
 ('fine', 1),
 ('inizio', 2),

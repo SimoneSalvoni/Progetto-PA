@@ -2,13 +2,20 @@ import 'dotenv/config';
 import express from 'express';
 import fileUpload from 'express-fileupload';
 import { db } from './Connection/connect.js';
-import { unlink, createWriteStream, readFileSync } from 'fs';
+import { unlink, createWriteStream, readFileSync, mkdir, access, constants, writeFile } from 'fs';
 import Tesseract from 'tesseract.js';
 import { MultaDao } from './DAO/multaDao.js';
 import { PostazioneDao } from './DAO/postazioneDao.js';
 import { TransitoDao } from './DAO/transitoDao.js';
 import { TrattaDao } from './DAO/trattaDao.js';
 import { jwtCheck, checkPostazione, checkTratta, checkDate, checkFile, checkTarga, checkTarghe, checkTimestamp, errorHandler } from './Middleware/middleware.js';
+
+access('./tmp', constants.F_OK, (err) => { mkdir('./tmp', (err)=>{console.log(err)})});
+access('./log', constants.F_OK, (err) => {
+    mkdir('./log', (err) => { console.log(err) });
+    writeFile('./log/log.txt', '', (err) => { console.log(err) })
+});
+access('./log/log.txt', constants.F_OK, (err) => { writeFile('./log/log.txt', '', (err) => { console.log(err) }) });
 
 db.authenticate().then(() => {
     console.log('Connesso al database');
@@ -47,8 +54,41 @@ e la rilevazione del passaggio di un'automobile alla fine di una tratta in assen
 @param mess {string} Il messaggio da loggare
 */
 let logError = function (mess) {
-    let stream = createWriteStream("../log/log.txt", { flags: 'a' });
+    let stream = createWriteStream("./log/log.txt", { flags: 'a' });
     stream.write(mess + '\n');
+}
+
+/*
+Questa funzione calcola l'importo della multa
+
+@param vel {number} La velocità media dell'auto
+@param limite {number} Il limite di velocità nella tratta
+@return {number} L'importo della multa, senza l'eventuale moltiplicatore dovuto a altre multe recenti
+*/
+let calcoloImporto = function (vel, limite) {
+    if ((vel - limite < 10)) return 1;
+    else if (vel - limite < 40) return 2;
+    else if (vel - limite < 60) return 4;
+    else return 8;
+}
+
+/*
+Questa funzione calcola le statistiche riguardanti il passaggio di autovetture nelle tratte
+
+@param listaTransiti {object} la lista dei transiti ottenuti dal db
+@param numeroTransiti {number} il numero di transiti nella lista
+
+@return {object} Un oggetto con dentro le statistiche calcolate
+*/
+let calcoloStat = function (listaTransiti, numeroTransiti) {
+    //x.velMedia è salvata come numeric sul db, ma viene restituita come stringa per qualche motivo. La passiamo in parseFloat
+    let velocita = listaTransiti.map(x => parseFloat(x.velMedia));
+    let velMedia = velocita.reduce((prec, succ) => prec + succ, 0) / numeroTransiti;
+    let velMax = Math.max(...velocita);
+    let velMin = Math.min(...velocita);
+    //Uso il + e toFixed per forzare due cifre decimali al massimo, ma non forzarne due quando non serve
+    let velStd = +(Math.sqrt(velocita.map(x => Math.pow(x - velMedia, 2)).reduce((a, b) => a + b) / numeroTransiti)).toFixed(2);
+    return { velocità_media: velMedia, velocità_max: velMax, velocità_min: velMin, deviazione_standard: velStd }
 }
 
 
@@ -60,7 +100,7 @@ app.post('/nuovarilevazione/:postazione', async (req, res) => {
     try {
         let file = req.files.file;
         let targa;
-        var filePath = '../tmp/' + file.name;
+        var filePath = './tmp/' + file.name;
         //Il file è salvato, dato che Tesseract richiede come parametro il path del file.
         let error = await file.mv(filePath);
         if (error) {
@@ -80,7 +120,7 @@ app.post('/nuovarilevazione/:postazione', async (req, res) => {
         }
         let postId = parseInt(req.params.postazione);
         //Si sono notati due errori che Tesseract compie nella scrittura: l'aggiunta di un trattino (presumibilmente è il simbolo
-        //della repubblica a confonderlo) e inserire un \n alla fine della stringa. Questi vengono rimosssi manualamente. 
+        //della repubblica a confonderlo) e inserimento di uno \n alla fine della stringa. Questi vengono rimosssi manualmente. 
         targa = targa.replace('-', '');
         targa = targa.replace('\n', '');
         let trattaId;
@@ -132,14 +172,11 @@ app.post('/nuovarilevazione/:postazione', async (req, res) => {
                 }
                 //Nel calcolo della velocità si moltiplica per 3.600.000 per averlo in km/h
                 let vel = ((distanza) / ((timestampFine - timestampInizio))) * 3600000;
+                //Se la velocità supera il limite si crea la multa dopo aver chiuso il transito
                 if (vel > limite) {
-                    //Se la velocità supera il limite si crea la multa dopo aver chiuso il transito
-                    let importo;
-                    if ((vel - limite < 10)) importo = 1;
-                    else if (vel - limite < 40) importo = 2;
-                    else if (vel - limite < 60) importo = 4;
-                    else importo = 8;
+                    let importo = calcoloImporto(vel, distanza);
                     let data = await MultaDao.getMulteRecenti(targa, timestampFine);
+                    //Se ci sono multe negli ultimi 30 giorno l'import aumenta del 50%
                     if (data.length !== 0) importo = importo * 1.5;
                     await TransitoDao.chiudiTransito(transitoAperto.idTransito, vel, timestampFine);
                     await MultaDao.creaMulta(targa, importo, timestampFine);
@@ -187,21 +224,14 @@ app.get('/listaveicoli/:tratta', async (req, res) => {
         else data = await TransitoDao.getTransitiTrattaData(tratta, timestampInizio, timestampFine);
         let listaTransiti = data.map(x => x.dataValues);
         let numeroTransiti = listaTransiti.length;
-        let velMedia = 0;
-        let velMax = 0;
-        let velMin = 0;
-        let velStd = 0;
         if (numeroTransiti !== 0) {
-            //x.velMedia è salvata come numeric sul db, ma viene restituita come stringa per qualche motivo. La passiamo in parseFloat
-            let velocita = listaTransiti.map(x => parseFloat(x.velMedia));
-            velMedia = velocita.reduce((prec, succ) => prec + succ, 0) / numeroTransiti;
-            velMax = Math.max(...velocita);
-            velMin = Math.min(...velocita);
-            //Uso il + e toFixed per forzare due cifre decimali al massimo, ma non forzarne due quando non serve
-            velStd = +(Math.sqrt(velocita.map(x => Math.pow(x - velMedia, 2)).reduce((a, b) => a + b) / numeroTransiti)).toFixed(2);
+            let stat = calcoloStat(listaTransiti)
+            let response = { veicoli_transitati: listaTransiti.map(x => x.targa), statistiche: stat };
+            return res.send(response)
         }
-        let response = { veicoli_transitati: listaTransiti.map(x => x.targa), statistiche: { velocità_media: velMedia, velocità_max: velMax, velocità_min: velMin, deviazione_standard: velStd } };
-        return res.send(response)
+        else {
+            return res.send("Su questa tratta, nel periodo in questione, non sono mai passate autovetture");
+        }
     }
     catch (err) {
         logError(err.message);
@@ -224,12 +254,8 @@ app.get('/stat/:targa/:tratta', async (req, res) => {
             return res.send("L'autovettura con la targa richiesta non ha mai attraversato la tratta");
         }
         else {
-            let velocita = listaTransiti.map(x => parseFloat(x.velMedia));
-            let velMedia = velocita.reduce((prec, succ) => prec + succ, 0) / numeroTransiti;
-            let velMax = Math.max(...velocita);
-            let velMin = Math.min(...velocita);
-            let velStd = +(Math.sqrt(velocita.map(x => Math.pow(x - velMedia, 2)).reduce((a, b) => a + b) / numeroTransiti)).toFixed(2);
-            let response = { statistiche: { velocità_media: velMedia, velocità_max: velMax, velocità_min: velMin, deviazione_standard: velStd } };
+            let stat = calcoloStat(listaTransiti, numeroTransiti);
+            let response = { statistiche: stat };
             return res.send(response)
         }
     }
@@ -267,7 +293,6 @@ app.get("/multe/:targa", async (req, res) => {
     try {
         let data = await MultaDao.getMulte(targa);
         let listaMulte;
-        let d = new Date();
         if (data.length === 0) listaMulte = [];
         else listaMulte = data.map(x => x.dataValues).map(y => {
             return { importo: parseFloat(y.importo), data: (new Date(parseInt(y.timestamp))).toDateString(), pagato: y.pagato }
@@ -308,7 +333,7 @@ Questa funzione definisce la rotta /propriemulte, con cui un utente car-owner pu
 app.get('/propriemulte', async (req, res) => {
     try {
         let listaMulte = [];
-        //se è valorizzato req.targa il jwt ha solo una stringa, se è valorizzato req.targhe ha un array di stringhe
+        //se è valorizzato req.targa il jwt ha solo una stringa, se invece è valorizzato req.targhe ha un array di stringhe
         if (req.targa) {
             let data = await MultaDao.getMulte(req.targa);
             listaMulte = listaMulte.concat(data.map(x => x.dataValues));
