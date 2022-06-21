@@ -52,7 +52,9 @@ SELECT * FROM (SELECT '0' `aperto`, '1655113800000' `timestampInizio`,  '1655114
 SELECT '0' `aperto`, '1655212043000' `timestampInizio`,  '1655212843000' `timestampFine`, '135.00' `velMedia`,  'DW367BX' `targa`, '4' `tratta` UNION ALL
 SELECT '0' `aperto`, '1655220078000' `timestampInizio`,  '1655220588000' `timestampFine`, '35.29' `velMedia`,  'AA123AA' `targa`, '3' `tratta` UNION ALL
 SELECT '0' `aperto`, '1655279219000' `timestampInizio`,  '1655279819000' `timestampFine`, '60.00' `velMedia`,  'AA123AA' `targa`, '2' `tratta` UNION ALL
-SELECT '0' `aperto`, '1655583307000' `timestampInizio`,  '1655584867000' `timestampFine`, '115.38' `velMedia`,  'BP482MN' `targa`, '5' `tratta`) A
+SELECT '0' `aperto`, '1655583307000' `timestampInizio`,  '1655584867000' `timestampFine`, '115.38' `velMedia`,  'BP482MN' `targa`, '5' `tratta` UNION ALL
+SELECT '0' `aperto`, '1655743656000' `timestampInizio`,  '1655744856000' `timestampFine`, '60.00' `velMedia`,  'AA123AA' `targa`, '1' `tratta` UNION ALL
+SELECT '0' `aperto`, '1655759293000' `timestampInizio`,  '1655760337000' `timestampFine`, '68.97' `velMedia`,  'BP482MN' `targa`, '1' `tratta`) A
 WHERE NOT EXISTS (SELECT * FROM Transito);
 
 INSERT INTO Multa(importo, targa, timestamp, pagato)
