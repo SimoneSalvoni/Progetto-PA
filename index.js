@@ -10,8 +10,13 @@ import { TransitoDao } from './DAO/transitoDao.js';
 import { TrattaDao } from './DAO/trattaDao.js';
 import { jwtCheck, checkPostazione, checkTratta, checkDate, checkFile, checkTarga, checkTarghe, checkTimestamp, errorHandler } from './Middleware/middleware.js';
 
+db.authenticate().then(() => {
+    console.log('Connesso al database');
+}).catch(err => {
+    console.log('Errore: ' + err);
+})
 
-async function createTmpLog (){
+async function createTmpLog() {
     access('./tmp', constants.F_OK, async (err) => { await promises.mkdir('./tmp', (err) => { console.log(err) }) });
     access('./log', constants.F_OK, async (err) => {
         await promises.mkdir('./log', (err) => { console.log(err) });
@@ -19,13 +24,6 @@ async function createTmpLog (){
     });
 }
 await createTmpLog();
-//access('./log/log.txt', constants.F_OK, async (err) => { await promises.writeFile('./log/log.txt', '', (err) => { console.log(err) }) });
-
-db.authenticate().then(() => {
-    console.log('Connesso al database');
-}).catch(err => {
-    console.log('Errore: ' + err);
-})
 
 let app = express();
 app.use(fileUpload());
@@ -92,7 +90,7 @@ let calcoloStat = function (listaTransiti, numeroTransiti) {
     let velMin = Math.min(...velocita);
     //Uso il + e toFixed per forzare due cifre decimali al massimo, ma non forzarne due quando non serve
     let velStd = +(Math.sqrt(velocita.map(x => Math.pow(x - velMedia, 2)).reduce((a, b) => a + b) / numeroTransiti)).toFixed(2);
-    return { velocità_media: velMedia, velocità_max: velMax, velocità_min: velMin, deviazione_standard: velStd }
+    return { numero_transiti: numeroTransiti, velocità_media: velMedia, velocità_max: velMax, velocità_min: velMin, deviazione_standard: velStd }
 }
 
 
@@ -229,7 +227,7 @@ app.get('/listaveicoli/:tratta', async (req, res) => {
         let listaTransiti = data.map(x => x.dataValues);
         let numeroTransiti = listaTransiti.length;
         if (numeroTransiti !== 0) {
-            let stat = calcoloStat(listaTransiti)
+            let stat = calcoloStat(listaTransiti,numeroTransiti)
             let response = { veicoli_transitati: listaTransiti.map(x => x.targa), statistiche: stat };
             return res.send(response)
         }
@@ -409,7 +407,7 @@ setInterval(() => {
     console.log("dentro all'interval")
     let date = new Date();
     TransitoDao.eliminaTransitiErrati(date.getTime());
-}, 3600000);
+}, 100000);
 
 
 

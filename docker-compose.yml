@@ -25,3 +25,4 @@ services:
           - SECRET_KEY=${SECRET_KEY}
         depends_on:
           - mysqldb
+        command: ['./wait-for-it/wait-for-it.sh', 'mysqldb:${MYSQL_PORT}', '--timeout=100000', '--', 'node', 'index.js']
