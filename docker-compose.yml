@@ -15,5 +15,13 @@ services:
         build: .
         ports:
           - ${PORT}:${EXTERNAL_PORT}
+        environment:
+          - PORT=${PORT}
+          - HOST=${HOST}
+          - DATABASE=${DATABASE}
+          - USERNAME=${USER}
+          - PASSWORD=${PASSWORD}
+          - MYSQL_PORT=${MYSQL_PORT}
+          - SECRET_KEY=${SECRET_KEY}
         depends_on:
           - mysqldb

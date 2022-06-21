@@ -1,5 +1,8 @@
-docker-compose.yml
 node_modules
 Dockerfile
 *.traineddata
 ./immagini_esempi
+log
+tmp
+.gitignore
+README.md

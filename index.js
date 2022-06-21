@@ -2,7 +2,7 @@ import 'dotenv/config';
 import express from 'express';
 import fileUpload from 'express-fileupload';
 import { db } from './Connection/connect.js';
-import { unlink, createWriteStream, readFileSync, mkdir, access, constants, writeFile } from 'fs';
+import { unlink, createWriteStream, readFileSync, promises, access, constants } from 'fs';
 import Tesseract from 'tesseract.js';
 import { MultaDao } from './DAO/multaDao.js';
 import { PostazioneDao } from './DAO/postazioneDao.js';
@@ -10,12 +10,16 @@ import { TransitoDao } from './DAO/transitoDao.js';
 import { TrattaDao } from './DAO/trattaDao.js';
 import { jwtCheck, checkPostazione, checkTratta, checkDate, checkFile, checkTarga, checkTarghe, checkTimestamp, errorHandler } from './Middleware/middleware.js';
 
-access('./tmp', constants.F_OK, (err) => { mkdir('./tmp', (err)=>{console.log(err)})});
-access('./log', constants.F_OK, (err) => {
-    mkdir('./log', (err) => { console.log(err) });
-    writeFile('./log/log.txt', '', (err) => { console.log(err) })
-});
-access('./log/log.txt', constants.F_OK, (err) => { writeFile('./log/log.txt', '', (err) => { console.log(err) }) });
+
+async function createTmpLog (){
+    access('./tmp', constants.F_OK, async (err) => { await promises.mkdir('./tmp', (err) => { console.log(err) }) });
+    access('./log', constants.F_OK, async (err) => {
+        await promises.mkdir('./log', (err) => { console.log(err) });
+        await promises.writeFile('log/log.txt', '', (err) => { console.log(err) })
+    });
+}
+await createTmpLog();
+//access('./log/log.txt', constants.F_OK, async (err) => { await promises.writeFile('./log/log.txt', '', (err) => { console.log(err) }) });
 
 db.authenticate().then(() => {
     console.log('Connesso al database');

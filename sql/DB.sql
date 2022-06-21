@@ -26,20 +26,3 @@ targa VARCHAR(7),
 timestamp VARCHAR(20),
 pagato BOOLEAN
 );
-IF ((SELECT COUNT(*) FROM Tratta)=0) INSERT INTO Tratta (limite, distanza) VALUES
-(70, 20),
-(50, 10),
-(40, 5),
-(90, 30),
-(110, 50);
-IF ((SELECT COUNT(*) FROM Postazione)=0) INSERT INTO Postazione (tipo, idTratta) VALUES
-('inizio', 1),
-('fine', 1),
-('inizio', 2),
-('fine', 2),
-('inizio', 3),
-('fine', 3),
-('inizio', 4),
-('fine', 4),
-('inizio', 5),
-('fine', 5);
