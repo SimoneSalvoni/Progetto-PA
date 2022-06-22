@@ -4,8 +4,10 @@ services:
         image: mysql
         restart: always
         environment:
-          - MYSQL_ROOT_PASSWORD=${PASSWORD}
-          - MYSQL_DATABASE=${DATABASE}
+          - MYSQL_ROOT_PASSWORD=
+          - MYSQL_USER=${USER}
+          - MYSQL_PASSWORD=${PASSWORD}
+          - MYSQL_DATABASE=Rilevazioni
           - MYSQL_ALLOW_EMPTY_PASSWORD=yes
         ports:
           - ${MYSQL_PORT}:${EXTERNAL_DB_PORT}
@@ -18,7 +20,6 @@ services:
         environment:
           - PORT=${PORT}
           - HOST=${HOST}
-          - DATABASE=${DATABASE}
           - USERNAME=${USER}
           - PASSWORD=${PASSWORD}
           - MYSQL_PORT=${MYSQL_PORT}

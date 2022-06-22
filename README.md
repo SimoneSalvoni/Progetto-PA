@@ -12,9 +12,8 @@ Per eseguire l’applicazione dunque bisogna:
 Il file .env, come menzionato sopra, va costruito autonomamente per poterci inserire tutte le variabili d’ambiente necessarie. Queste sono
 -	PORT: la porta interna al container su cui si esporrà il server
 -	HOST: l'host su cui si contatterà il server
--	DATABASE: il nome del database
--	USER: il nome dell’utente che si connette al DB
--	PASSWORD: la password dell’utente per accedere al DB
+-	USER: il nome dell’utente che si connetterà al DB. Verrà creato con la costruzione dell'immagine di mysql. **DEVE** essere diverso da "root".
+-	PASSWORD: la password dell’utente sopracitato per accedere al DB.
 -	MYSQL_PORT: la porta interna al container su cui si espone il DB
 -	EXTERNAL_PORT: la porta del sistema host su cui si mapperà la porta interna al container per il server
 -	EXTERNAL_DB_PORT: la porta del sistema host su cui si mapperà la porta interna al container per il DB
