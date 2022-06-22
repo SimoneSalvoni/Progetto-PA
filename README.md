@@ -7,7 +7,7 @@ Per eseguire l’applicazione dunque bisogna:
 -	Successivamente, supponendo che il sistema sia già configurato con docker e docker-compose, bisogna posizionarsi nella cartella root del progetto, in cui si trovano il Dockerfile e docker-compose.yml
 -	Si deve preparare il file .env in cui inserire le variabili d’ambiente da sfruttare
 -	A questo punto si costruiscono le immagini e si fanno partire i container e la rete che li collega tramite il comando ``` docker-compose up```
--	Per chiudere i container si può eseguire  ``` docker-compose stop``` (in questo caso sarà possibile farli ripartire con  ``` docker-compose start [NOME_CONTAINER]``` successivamente), oppure con  ``` docker-compose down``` se si vuole anche rimuoverli, assieme alla rete.
+-	Per chiudere i container si può eseguire ``` docker-compose down```, tramite il quale si rimuovono anche i container e la rete.
 
 Il file .env, come menzionato sopra, va costruito autonomamente per poterci inserire tutte le variabili d’ambiente necessarie. Queste sono
 -	PORT: la porta interna al container su cui si esporrà il server
@@ -247,6 +247,7 @@ Un esempio di chiamata all'API è la seguente:
 Eseguita la chiamata, la risposta che il richiedente otterrà sarà di questa forma:
 
 ![](immagini_esempi/tratte/risposta1.jpg)
+
 ![](immagini_esempi/tratte/risposta2.jpg)
 
 
