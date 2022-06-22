@@ -1,87 +1,89 @@
 # Progetto-PA
-L’applicazione permette di simulare un sistema di rilevazione di velocità di veicoli stradali attraverso coppie di terminali fissi che determinano, a coppie, una tratta. Chiameremo questi terminali postazioni, distinguendoli per tipologia (‘inizio’ o ‘fine’). Viene prevista inoltre l’assegnazione automatica di multe qualora avvenissero delle infrazioni del limite di velocità per una data tratta, le cui informazioni sono conservate all’interno del database. 
+Questa applicazione permette di simulare un sistema di rilevazione di velocità di veicoli stradali attraverso coppie di terminali fissi che determinano delle tratte. Chiameremo questi terminali "postazioni", distinguendoli per tipologia (‘inizio’ o ‘fine’). Viene prevista inoltre l’assegnazione automatica di multe qualora avvenissero delle infrazioni del limite di velocità per una data tratta, le cui informazioni sono conservate all’interno del database. 
 Sono anche fornite funzionalità per altre due categorie di utenti, in questo caso umani, ovvero utenti amministratori e gli automobilisti. I primi possono richiedere al sistema informazioni sulle tratte e sul transito che avviene su di esse, mentre i secondi possono controllare le proprie multe per poi pagarle. Le singole funzionalità verranno descritte più nel dettaglio in seguito.
 Sia l’applicazione server sia il database sono gestiti tramite container Docker. Sono presenti infatti un Dockerfile e un docker-compose.yml. 
 Per eseguire l’applicazione dunque bisogna:
--	Per prima cosa clonare il repository con:``` git clone https://github.com/Ziozimomo/Progetto-PA```
+-	Per prima cosa clonare il repository con: ```git clone https://github.com/Ziozimomo/Progetto-PA```
 -	Successivamente, supponendo che il sistema sia già configurato con docker e docker-compose, bisogna posizionarsi nella cartella root del progetto, in cui si trovano il Dockerfile e docker-compose.yml
 -	Si deve preparare il file .env in cui inserire le variabili d’ambiente da sfruttare
--	A questo punto si costruiscono le immagini (se non già presenti) e si fanno partire i container e la rete che li collega tramite il comando ``` docker-compose up```
+-	A questo punto si costruiscono le immagini e si fanno partire i container e la rete che li collega tramite il comando ``` docker-compose up```
 -	Per chiudere i container si può eseguire  ``` docker-compose stop``` (in questo caso sarà possibile farli ripartire con  ``` docker-compose start [NOME_CONTAINER]``` successivamente), oppure con  ``` docker-compose down``` se si vuole anche rimuoverli, assieme alla rete.
 
 Il file .env, come menzionato sopra, va costruito autonomamente per poterci inserire tutte le variabili d’ambiente necessarie. Queste sono
 -	PORT: la porta interna al container su cui si esporrà il server
+-	HOST: l'host su cui si contatterà il server
 -	DATABASE: il nome del database
--	USERNAME: il nome dell’utente che si connette al DB
+-	USER: il nome dell’utente che si connette al DB
 -	PASSWORD: la password dell’utente per accedere al DB
 -	MYSQL_PORT: la porta interna al container su cui si espone il DB
--	EXTERNAL_PORT: la porta del sistema host su cui si mapperà porta interna al container per il server
--	EXTERNAL_DB_PORT: la porta del sistema host su cui si mapperà porta interna al container per il DB
--	HOST????????????: COME LO DEFINISCO??
+-	EXTERNAL_PORT: la porta del sistema host su cui si mapperà la porta interna al container per il server
+-	EXTERNAL_DB_PORT: la porta del sistema host su cui si mapperà la porta interna al container per il DB
 -	SECRET_KEY: chiave usata per la firma del jwt
 ## Struttura del codice
 Il codice è suddiviso nei seguenti moduli:
--	index- Questo modulo è quello centrale del progetto. Costruisce il server, definisce le rotte e le callback per gestire le richieste. 
--	connection-Questo modulo istanza la connessione al database.
--	DAO-All’interno di questa directory troviamo i DAO, usati per comunicare con il DB
--	Models-In questa directory troviamo i moduli che contengono le classi con cui si modellano le tabelle del DB
--	Middleware-In questo modulo sono definiti i middleware chiamati prima delle effettive callback di gestione delle richieste. 
-Come menzionato, si è implementato il pattern DAO per gestire la comunicazione con il database. In questo modo si sono ben separate le funzionalità di gestione delle richieste (gestite da index e dai middleware), la comunicazione con il DB (gestite dai vari DAO), e la modellazione delle tabelle (che si trovano dentro Models). DAO e modelli sono stati costruiti sfruttando la libreria Sequelize, per cui la loro struttura è un po’ diversa dalla definizione classica delle classi ed interfacce che costituiscono i modelli e i DAO.
-È stato anche implementato il pattern Middleware per eseguire controlli sulle richieste prima di passarli alle callback di gestione. In questo modo si vogliono identificare richieste mal strutturate che arrivano al server prima di passarle alle effettive funzionalità di elaborazione. I controlli da eseguire sulle varie rotte sono di varia tipologia: sono quindi stati costruiti più middleware che vengono chiamati a catena. Questa tipologia di catena è tendenzialmente definita come “catena di responsabilità”. Ogni middleware esegue un controllo, e se tutto va bene passa la staffetta al middleware successivo. Se invece si incontra un errore la catena è interrotta. 
+-	**index** - Questo modulo è quello centrale del progetto. Costruisce il server, definisce le rotte e le callback per gestire le richieste. 
+-	**connection** - Questo modulo istanza la connessione al database.
+-	**DAO** - All’interno di questa directory troviamo i DAO, usati per comunicare con il DB
+-	**Models** - In questa directory troviamo i moduli che contengono le classi con cui si modellano le tabelle del DB
+-	**Middleware** - In questo modulo sono definiti i middleware chiamati prima delle effettive callback di gestione delle richieste. 
+
+Come menzionato, si è implementato il pattern DAO per gestire la comunicazione con il database. In questo modo si sono ben separate le funzionalità di gestione delle richieste (gestite da index e dai middleware), la comunicazione con il DB (gestite dai vari DAO), e la modellazione delle tabelle (tramite le classi che si trovano dentro Models). DAO e modelli sono stati costruiti sfruttando la libreria Sequelize, per cui la loro struttura è un po’ diversa da quella dettata dalla definizione classica delle classi ed interfacce che costituiscono i modelli e i DAO.
+È stato anche implementato il pattern Middleware per eseguire controlli sulle richieste prima di passarli alle callback di gestione. In questo modo si vogliono identificare richieste mal strutturate che arrivano al server prima di passarle alle effettive funzionalità di elaborazione. I controlli da eseguire sulle varie rotte sono di varia tipologia: sono quindi stati costruiti più middleware che vengono chiamati a catena. Questa tipologia di catena è tendenzialmente definita come “catena di responsabilità”. Ogni middleware esegue un controllo, e se tutto va bene passa la staffetta al middleware successivo. Se invece si incontra un errore la catena è interrotta e viene restituito un errore. 
+
 Il seguente diagramma rappresenta i moduli che compongono le applicazioni, le loro funzionalità e come si legano:
-![](immagini_esempio/module_diagram.png)
+![](immagini_esempi/module_diagram.png)
 
 ## Funzionamento
-Come accennato in precedenza, il sistema prevede l’utilizzo di un database MySQL per la lettura dei dati necessari per svolgere le sue operazioni e per la conservazione delle rilevazioni eseguite (ed eventuali multe ad esse collegate). All’avvio entrambi i container docker, rispettivamente uno per Node.js che contiene il nostro backend e uno per il database MySQL, vengono messi in esecuzione e il sistema si mette in attesa delle possibili richieste dei suoi utenti. Queste ultime sono divise per tipologia di utente: postazione (i terminali fissi responsabili delle rilevazioni su strada), amministratore e automobilista. 
+Come accennato in precedenza, il sistema prevede l’utilizzo di un database SQL, gestito con il DBMS MySQL, per la lettura dei dati necessari per svolgere le sue operazioni e per la conservazione delle rilevazioni eseguite (e delle eventuali multe ad esse collegate). All’avvio entrambi i container, rispettivamente uno per il backend e uno per il database, vengono messi in esecuzione e il sistema si mette in attesa delle possibili richieste dei suoi utenti. Si sono dovuti eseguire accorgimenti per assicurarsi che il container del backend parta solo quando il database ha completato la sua inizializzazione. Infatti l'opzione *depends-on* nel file docker-compose.yml non era sufficiente, dato che garantiva esclusivamente che i container partissero nel giusto ordine, ma non forzava quello del backend ad aspettare. Si è deciso quindi di utilizzare uno script bash, *wait-for-it.sh* che mette in attesa il container fino a che non rileva che il DB è pronto. Lo script è stato ottenuto da questo repository: https://github.com/vishnubob/wait-for-it.
+
+Le richieste eseguibili sono divise per tipologia di utente: postazione (i terminali fissi responsabili delle rilevazioni su strada), amministratore e automobilista. 
 
 ### Funzioni per postazione
-Alla postazione viene permesso di inviare al sistema i dati relativi ad una rilevazioni, quali targa del veicolo in formato JSON o per immagine, timestamp e ID della postazione stessa.
-Il sistema riceve la richiesta e distingue le operazioni da svolgere a seconda del tipo di Postazione.  
-Se la postazione è salvata nel database come ‘inizio’ viene creato un oggetto Transito che valorizza parte dei suoi campi con la targa del veicolo (estratta tramite la libreria Tesseract nel caso in cui venga fornita come immagine), il timestamp preso come TimestampInizio e l’ID relativo alla Tratta a cui appartienela postazione (ricavabile a partire dalla tabella delle postazioni). 
-Se invece essa è di tipo ‘fine’, si cerca nel database un transito aperto sulla tratta della postazione con la targa rilevata e, in caso di riscontro, esso viene chiuso e aggiornato con il tempo di uscita, la velocità media del veicolo durante il percorso. Nel caso quest’ultima superi il limite di velocità imposto per la tratta corrispondente, viene anche creata una multa con importo variabile a seconda del tipo di infrazione.
+Alla postazione viene permesso di inviare al sistema i dati relativi ad una rilevazione, ovvero targa del veicolo, in formato JSON o tramite immagine, timestamp e ID della postazione stessa.
+Il sistema riceve la richiesta e distingue le operazioni da svolgere a seconda del tipo di postazione.  
+Se la postazione è salvata nel database come ‘inizio’ viene creato un oggetto Transito che valorizza parte dei suoi campi con la targa del veicolo (estratta tramite la libreria Tesseract nel caso in cui venga fornita come immagine), il timestamp, che sarà quello di "apertura della tratta", e l’ID relativo alla Tratta a cui appartienela la postazione (ricavabile a partire dalla tabella delle postazioni). 
+Se invece essa è di tipo ‘fine’, si cerca nel database un transito aperto sulla tratta relativa alla postazione che ha mandato la richiesta con la targa rilevata e, in caso di riscontro, esso viene chiuso e aggiornato con il tempo di uscita e la velocità media del veicolo durante il percorso. Nel caso quest’ultima superi il limite di velocità imposto per la tratta corrispondente, viene anche creata una multa con importo variabile a seconda del tipo di infrazione.
 
 ![](immagini_esempi/UseCase/UseCasePostazione.png)
 
 ### Funzioni per amministratore
-All’amministratore viene permesso di consultare il sistema rispetto ai dati presenti sul database. In particolare è possibile richiedere:
+All’amministratore viene permesso di consultare i dati presenti nel sistema e di eseguire semplici analisi. In particolare è possibile richiedere:
 
--	La lista dei veicoli transitati in un dato intervallo temporale in una data tratta, unita ad una serie di statistiche quali numero transiti, velocità media, minima e massima dei veicoli e la deviazione standard
--	Le stesse statistiche per un singolo veicolo dati una targa, una tratta e un intervallo di tempo
--	La lista delle tratte con i dettagli relativi alle postazioni che la costituiscono e la distanza tra queste ultime
--	La lista delle multe e il loro relativo stato di pagamento data una targa
--	La lista delle multe non pagate
+-	La lista dei veicoli transitati, in un dato intervallo temporale in una data tratta, unita ad una serie di statistiche quali numero transiti, velocità media, minima e massima dei veicoli e la relativa deviazione standard.
+-	Le stesse statistiche per un singolo veicolo, date una targa e una tratta.
+-	La lista delle tratte con i dettagli relativi alle postazioni che la costituiscono e la distanza tra queste ultime.
+-	La lista delle multe e il loro relativo stato di pagamento, data una targa.
+-	La lista di tutte le multe attualmente non pagate.
 
 ![](immagini_esempi/UseCase/UseCaseAdmin.png)
 
 ### Funzioni per automobilisti
-Agli automobilisti è permesso di operare sulle multe relative ai propri veicoli, le cui targhe vengono recuperate dal proprio token JWT. In particolare è possibile richiedere:
+Agli automobilisti è permesso di operare sulle multe relative ai propri veicoli, le cui targhe vengono recuperate dal proprio JWT. In particolare è possibile:
 
--	La lista delle proprie multe con relativo stato di pagamento
--	Il pagamento di una multa dato il suo relativo ID
+-	Richiedere la lista delle proprie multe con relativo stato di pagamento
+-	Pagare una multa, dato il suo relativo ID.
 
 ![](immagini_esempi/UseCase/UseCaseCarowner.png)
 
 Per soddisfare queste richieste vengono quindi definite le seguenti rotte:
 
 ### Postazione
-Previa autenticazione JWT (ruolo ‘smartautovelox’):
 
 |Rotta       | Descrizione|
 |-----------|------------------------|
-|/nuovarilevazione/:postazione (inizio)| Il sistema inserisce un transito aperto con i dati della rilevazione attuale|
-|/nuovarilevazione/:postazione (fine)| Il sistema aggiorna il transito aperto con i dati della rilevazione attuale e lo chiude|
-|/nuovarilevazione/:postazione (fine con multa)| Il sistema aggiorna il transito con i dati della rilevazione attuale e inserisce|
+|/nuovarilevazione/:postazione| Il sistema inserisce un transito aperto con i dati della rilevazione attuale o chiude uno già aperto. Se necessario crea una multa.|
 
 #### UML: Diagrammi delle sequenze
 
 > /nuovarilevazione/:postazione
-
+Postazione di inizio tratta:
 ![](immagini_esempi/SequenceDiagram/diagramma_sequenze_rilevatore_inizio.png)
+Postazione di fine tratta:
 ![](immagini_esempi/SequenceDiagram/diagramma_sequenze_rilevatore_fine.png)
+Postazione di fine tratta con infrazione e relativa generazione di multa:
 ![](immagini_esempi/SequenceDiagram/diagramma_sequenze_rilevatore_fine_multa.png)
 
 ### Amministratore
-Previa autenticazione JWT (ruolo ‘admin’):
 
 |Rotta       | Descrizione|
 |-----------|------------------------|
@@ -114,7 +116,6 @@ Previa autenticazione JWT (ruolo ‘admin’):
 ![](immagini_esempi/SequenceDiagram/diagramma_sequnze_admin_multe.png)
 
 ### Automobilista
-Previa autenticazione JWT (ruolo ‘car_owner’):
 
 |Rotta       | Descrizione|
 |-----------|------------------------|
@@ -131,22 +132,26 @@ Previa autenticazione JWT (ruolo ‘car_owner’):
 
 ![](immagini_esempi/SequenceDiagram/diagramma_sequenze_car_owner_pagamento.png)
 
-## Descrizione delle API
- In questa sezione si andrà più nel dettaglio sulle varie chiamate HTTP eseguibili all'applicazione, specificando i vari parametri da inserire e mostrando per ognuna di esse un esempio, con i relativi risultati. Questi esempi verranno presentati tramite il software *Postman*
-Gli esempi mostrati si baseranno sulla seguenta lista di postazioni e tratte, che è quella inserita con il seeding iniziale del DB:
+## Descrizione delle API, con esempi
+In questa sezione si andrà più nel dettaglio sulle varie chiamate HTTP eseguibili, specificando i vari parametri da inserire e mostrando per ognuna di esse un esempio, con i relativi risultati. Questi esempi verranno presentati tramite il software *Postman*.
+Gli esempi mostrati si baseranno sulla seguente lista di postazioni e tratte, che è quella inserita con il seeding iniziale del DB:
 
-![](immagini_esempi/tabella_postazioni.jpg)
+![](immagini_esempi/tabella_post.jpg)
 ![](immagini_esempi/tabella_tratte.jpg)
 
- Una nota che vale per tutte le API. Un parametro da allegare alla chiamata è sempre un JSON Web Token, JWT in breve. Esso è sfruttato per controllare il ruolo dell'utente (e in alcuni casi anche per altro).
- I tre ruoli sono: "smartautovelox", "admin" e "car-owner". Utenti di ruolo diverso hanno a disposizione API diverse.
- Il JWT viene firmato tramite l'algoritmo HS256 (HMAC+SHA256). La chiave segreta da utilizzare viene specificata lato backend nel file .env. 
-In Postaman il JWT è inserito nella sezione “Authorization”:
+Si supporrà inoltre di avere i seguenti transiti e multe già presenti nel DB (anche in questo caso inseriti con il seeding):
+![](immagini_esempi/transiti_iniziali.jpg)
+![](immagini_esempi/multe_iniziali.jpg)
+
+Una nota che vale per tutte le API. A qualunque chiamata è sempre da allegare come parametro un JSON Web Token, JWT in breve. Esso è utilizzato per controllare il ruolo dell'utente (e in alcuni casi anche per altro).
+I tre ruoli sono: "smartautovelox", "admin" e "car-owner". Utenti di ruolo diverso hanno a disposizione API diverse.
+Il JWT viene firmato tramite l'algoritmo HS256 (HMAC+SHA256). La chiave segreta da utilizzare viene specificata lato backend nel file .env, come descritto nel primo paragrafo. 
+In Postman il JWT è inserito nella sezione “Authorization”:
 
 ![](immagini_esempi/nuovarilevazione/inizio_immagine/jwt.jpg)
 
  ### Utente *smartautovelox*
-Il JWT di un utente con questo ruolo dovrà contenere il campo “Role”, con valore “smartautovelox”.Sarà della forma seguente:
+Il JWT di un utente con questo ruolo dovrà contenere il campo “Role”, con valore “smartautovelox”. Sarà della forma seguente:
 
 ![](immagini_esempi/jwtautovelox.jpg)
 
@@ -157,10 +162,10 @@ Il JWT di un utente con questo ruolo dovrà contenere il campo “Role”, con v
   Alla chiamata vanno allegati tre parametri e un file:
   
 
- 1. L'indice che indica la postazione che ha eseguito la chiamata. Questo parametro è specificato nella rotta.
+ 1. L'indice che indica la postazione che ha eseguito la chiamata. Questo parametro è un ID ed è specificato nella rotta.
  2. Il timestamp che indica quando la rilevazione è stata eseguita. Questo è da porre nell'header della chiamata. Il timestamp deve essere in formato Unix epoch, con precisione al millisecondo. La chiave da associare al timestamp è "timestamp". 
- 3. Un jwt per l'autenticazione. Questo jwt deve contenere il campo "Role", e il valore deve essere "smartauvelox". 
- 4. Il file da cui estrarre la targa. Questo file può essere di due tipologie: un'immagine (di formato jpg o png) che contiene la targa, oppure un file JSON con il campo "targa". In entrambi i casi il file va spedito come “form-data”, in modo che si possa associare al file la chiave “file”, tramite la quale il sistema la estrae dal body. NOTA IMPORTANTE: per limitazioni di lettura della libreria utilizzata per la scansione delle immagini, Tesseract, l'immagine deve contenere esclusivamente la targa, senza elementi esterni che vadano a confondere Tesseract. 
+ 3. Il JWT. 
+ 4. Il file da cui estrarre la targa. Questo file può essere di due tipologie: un'immagine (di formato jpg o png) che contiene la targa, oppure un file JSON con il campo "targa". In entrambi i casi il file va spedito come “form-data”, in modo che si possa associare al file la chiave “file”, tramite la quale il sistema la estrae dal body della richiesta. NOTA IMPORTANTE: per limitazioni di lettura della libreria utilizzata per la scansione delle immagini, Tesseract, l'immagine deve contenere esclusivamente la targa, senza elementi esterni che vadano a confondere la scansione dell'immagine. 
   
 Un esempio di chiamata all'API è la seguente:
 
@@ -170,20 +175,22 @@ Il timestamp, come detto prima, è inserito nell’header:
 
 ![](immagini_esempi/nuovarilevazione/inizio_immagine/timestamp.jpg)
 
-L’immagine/JSON fa invece parte del body della richiesta.
+Il file, che sia esso un JSON o un'immagine PNG/JPG, fa invece parte del body della richiesta:
 
 ![](immagini_esempi/nuovarilevazione/inizio_immagine/immagine.jpg)
-![](immagini_esempi/nuovarilevazione/inizio json.jpg)
+![](immagini_esempi/nuovarilevazione/inizio_json.jpg)
 
-Se la postazione è una postazione di inizio tratta,una volta processata la richiesta verrà generato un nuovo transito sul DB:
+Se la postazione è una postazione di inizio tratta, una volta processata la richiesta verrà generato un nuovo transito sul DB:
 
-![](immagini_esempi/nuovarilevazione/inizio_immagine/aggiunta.jpg)
+![](immagini_esempi/nuovarilevazione/inizio_immagine/aggiunta1.jpg)
+![](immagini_esempi/nuovarilevazione/inizio_immagine/aggiunta2.jpg)
 
 Se invece la postazione è finale, il transito verrà chiuso:
 
+![](immagini_esempi/nuovarilevazione/inizio_immagine/aggiunta1.jpg)
 ![](immagini_esempi/nuovarilevazione/fine_immagine/risultato.jpg)
 
-Inoltre, se viene superato il limite di velocità verrà generata una multa da pagare:
+Inoltre, se viene superato il limite di velocità verrà generata una multa da pagare, simile alla seguente:
 
 ![](immagini_esempi/nuovarilevazione/fine_immagine/multagenerata.jpg)
 
@@ -198,15 +205,15 @@ A questa tipologia di utente è associata una serie di possibili chiamate HTTP.
 
 I parametri da associare alla chiamata sono:
 1.	L’indice che indica la tratta richiesta. Va inserito nella rotta. 
-2.	Il JWT
-3.	Opzionalmente, si può specificare l’intervallo temporale di ricerca. In questo caso vanno aggiunti due parametri nell’header, chiamati “inizio” e “fine”. Le date devono avere la sintassi: YYYY-MM-DD. 
+2.	Il JWT.
+3.	Opzionalmente, si può specificare l’intervallo temporale di ricerca. In questo caso vanno aggiunti due parametri nell’header, chiamati “inizio” e “fine”. Le date devono avere la seguente sintassi: YYYY-MM-DD. 
 
 
 Un esempio di chiamata all'API è la seguente:
 
 ![](immagini_esempi/listatransiti/rotta.jpg)
 
-Un esempio delle date nell’header sono il seguente:
+Un esempio delle date nell’header è il seguente:
 
 ![](immagini_esempi/listatransiti/date.jpg)
 
@@ -214,11 +221,11 @@ Eseguita la chiamata, la risposta che il richiedente otterrà sarà di questa fo
 
 ![](immagini_esempi/listatransiti/risposta.jpg)
 
-> Metodo HTTP: **GET**. Rotta: **’/stat/:targa/:tratta’'**
+> Metodo HTTP: **GET**. Rotta: **’/stat/:targa/:tratta’**
 
 I parametri da associare alla chiamata sono:
 1.	La targa sulla quale si vogliono calcolare le statistiche, da inserire nella rotta.
-2.	L’indice della tratta sulla quale si vogliono calcolare le statistiche, anch’esso da inserire nella rotta.
+2.	L’indice della tratta sulla quale si vogliono calcolare le statistiche, anch’esso da inserire nella rotta, dopo la targa.
 3.	Il JWT
 
 Un esempio di chiamata all'API è la seguente:
@@ -229,7 +236,7 @@ Eseguita la chiamata, la risposta che il richiedente otterrà sarà di questa fo
 
 ![](immagini_esempi/stat/risultato.jpg)
 
-> Metodo HTTP: **GET**. Rotta: **’/tratte’'**
+> Metodo HTTP: **GET**. Rotta: **’/tratte’**
 
 In questo caso l’unico parametro richiesto è il JWT.
 
@@ -239,16 +246,16 @@ Un esempio di chiamata all'API è la seguente:
 
 Eseguita la chiamata, la risposta che il richiedente otterrà sarà di questa forma:
 
-![](immagini_esempi/stat/risposta1.jpg)
-![](immagini_esempi/stat/risposta2.jpg)
+![](immagini_esempi/tratte/risposta1.jpg)
+![](immagini_esempi/tratte/risposta2.jpg)
 
 
-> Metodo HTTP: **GET**. Rotta: **’/multe/:targa**
+> Metodo HTTP: **GET**. Rotta: **’/multe/:targa’**
 
 I parametri da associare alla chiamata sono:
 
-1.	La targa relativa all’auto di cui si vogliono ottenere le multe
-2.	Il JWT
+1.	La targa relativa all’auto di cui si vogliono ottenere le multe, da inserire nella rotta.
+2.	Il JWT.
 
 Un esempio di chiamata all'API è la seguente:
 
@@ -259,7 +266,7 @@ Eseguita la chiamata, la risposta che il richiedente otterrà sarà di questa fo
 ![](immagini_esempi/multepertarga/risultato.jpg)
 
 
-> Metodo HTTP: **GET**. Rotta: **’/multeaperte**
+> Metodo HTTP: **GET**. Rotta: **’/multeaperte’**
 
 In questo caso l’unico parametro richiesto è il JWT.
 
@@ -280,7 +287,7 @@ Un esempio di JWT è il seguente:
 
 A questo ruolo sono associati due metodi.
 
-> Metodo HTTP: **GET**. Rotta: **’/propriemulte**
+> Metodo HTTP: **GET**. Rotta: **’/propriemulte’**
 
 In questo caso l’unico parametro richiesto è il JWT.
 
@@ -290,23 +297,32 @@ Un esempio di chiamata all'API è la seguente:
 
 Eseguita la chiamata, la risposta che il richiedente otterrà sarà di questa forma:
 
-![](immagini_esempi/proprie_multe/risposta1.jpg)
-![](immagini_esempi/proprie_multe/risposta2.jpg)
+![](immagini_esempi/proprie_multe/risultato.jpg)
 
-> Metodo HTTP: **PATCH**. Rotta: **’/pagamento/:idMulta**
+> Metodo HTTP: **PATCH**. Rotta: **’/pagamento/:idMulta’**
 
 I parametri da associare alla chiamata sono:
-1.	L’id della multa da pagare, da inserire nella rotta
-2.	Il JWT
+1.	L’id della multa da pagare, da inserire nella rotta.
+2.	Il JWT.
 
 Un esempio di chiamata all'API è la seguente:
 
 ![](immagini_esempi/pagamento/rotta.jpg)
 
-Eseguita la chiamata, la risposta che il richiedente otterrà sarà di questa forma:
+Supponendo di avere una multa da pagare relativa all'utente richiedente come la seguente:
 
-![](immagini_esempi/pagamento/risposta.jpg)
+![](immagini_esempi/pagamento/multadapagare.jpg)
+
+Eseguita la chiamata, la risposta che il richiedente otterrà sarà un semplice messaggio di pagamento eseguito.
 
 La multa sarà quindi segnalata come pagata nel back-end:
 
 ![](immagini_esempi/pagamento/multapagata.jpg)
+
+##Suddivisione del lavoro
+Lavoro comune:
+Progettazione del software - README
+Simone Salvoni:
+index, Middleware, Connection - testing dell'applicazione
+Giovanni Recchi:
+DAO, Models - Progettazione del database, creazione del seeding
