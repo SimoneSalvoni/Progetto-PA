@@ -149,13 +149,13 @@ app.post('/nuovarilevazione/:postazione', async (req, res) => {
         else {
             //Se è una postazione di fine si ricerca un transito aperto dalla stessa targa sulla stessa tratta per chiuderlo
             let data = await TransitoDao.ricercaTransitoAperto(targa, trattaId);
-            let transitoAperto = data.dataValues;
-            if (!transitoAperto) {
+            if (!data) {
                 logError(`ERRORE:RILEVATO TRANSITO DI AUTOVETTURA ALLA FINE DI UN TRATTO SENZA LA PRECEDENTE RILEVAZIONE DI\
                 ENTRATA NEL TRATTO. Postazione: ${postId}. Tratta: ${trattaId}. Timestamp: ${timestamp}`);
                 return res.sendStatus(400);
             }
             else {
+                let transitoAperto = data.dataValues;
                 let timestampInizio = parseInt(transitoAperto.timestampInizio);
                 let timestampFine = timestamp;
                 let distanza;
@@ -404,7 +404,6 @@ transiti aperti per troppo tempo, nello specifico da più di due ore rispetto al
 si definisce un operazione di pulizia del DB che viene ripetuta ciclamente.
 */
 setInterval(() => {
-    console.log("dentro all'interval")
     let date = new Date();
     TransitoDao.eliminaTransitiErrati(date.getTime());
 }, 100000);
