@@ -64,6 +64,7 @@ Agli automobilisti è permesso di operare sulle multe relative ai propri veicoli
 
 ![](immagini_esempi/UseCase/UseCaseCarowner.png)
 
+
 Per soddisfare queste richieste vengono quindi definite le seguenti rotte:
 
 ### Postazione
@@ -318,6 +319,14 @@ Eseguita la chiamata, la risposta che il richiedente otterrà sarà un semplice 
 La multa sarà quindi segnalata come pagata nel back-end:
 
 ![](immagini_esempi/pagamento/multapagata.jpg)
+
+## Gestione delle situazioni di errore
+Gran parte degli errori è gestita semplicemente notificando il richiedente che qualcosa è andato storto o che la richiesta è mal formata.
+L'aggiunta di rilevazioni può però portare ad alcune situazioni di errore che vengono gestite in maniera un poco più complessa, e che quindi vale la pena descrivere più approfonditamente:
+1.  **Targa illeggibile** - Nel caso in cui Tesseract non riesca ad estrarre una targa sensata viene loggato un errore in un file log.txt, in cui si segnala che una certa postazione ha spedito una rilevazione, con un certo timestamp, la cui targa risulta illeggibile. Alla postazione viene ritornata una risposta con status code 400. Non viene creato alcun transito, dato che in assenza della targa le altre informazioni sono inutilizzabili.
+2. **Rilevazione finale in assenza di quella iniziale** - Nel caso in cui venga rilevata un passaggio di un'automobile da una postazione di fine tratta prima che lo faccia una di inizio tratta ci si trova chiaramente in una situazione di errore. È impossibile riuscirne a determinare la causa, e per questo questo errore si gestisce nello stesso identico modo el caso precedente.
+3. **Rilevazione iniziale e finale con lo stesso timestamp** - Nel caso in cui arrivi una nuova rilevazione da una postazione di fine tratta che fornisce lo stesso timestamp che aveva fornito quella di inizio tratta precedentemente ci si trova in una situazione di errore. Anche in questo caso si logga l'errore e si restituisce uno status code 400.
+4. **Transito aperto per troppo tempo** - Se un transito rimane aperto per troppo tempo non ha più senso chiuderlo con la successiva rilevazione di fine tratta. Per questo nell'applicazione è definita un'operazione di pulizia del DB, che cancella transiti aperti da troppo tempo periodicamente. Attualmente l'operazione viene eseguita ogni 100 secondi per motivi di testing, e cancella ogni transito aperto più vecchio di due ore rispetto alla data attuale. Sono comunque valori semplicemente modificabili.
 
 ## Suddivisione del lavoro
 Lavoro comune:
