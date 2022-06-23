@@ -319,10 +319,15 @@ La multa sarà quindi segnalata come pagata nel back-end:
 
 ![](immagini_esempi/pagamento/multapagata.jpg)
 
-##Suddivisione del lavoro
+## Suddivisione del lavoro
 Lavoro comune:
+
 Progettazione del software - README
+
 Simone Salvoni:
+
 index, Middleware, Connection - testing dell'applicazione
+
 Giovanni Recchi:
+
 DAO, Models - Progettazione del database, creazione del seeding
