@@ -5,19 +5,19 @@ Sia l’applicazione server sia il database sono gestiti tramite container Docke
 Per eseguire l’applicazione dunque bisogna:
 -	Per prima cosa clonare il repository con: ```git clone https://github.com/Ziozimomo/Progetto-PA```
 -	Successivamente, supponendo che il sistema sia già configurato con docker e docker-compose, bisogna posizionarsi nella cartella root del progetto, in cui si trovano il Dockerfile e docker-compose.yml
--	Si deve preparare il file .env in cui inserire le variabili d’ambiente da sfruttare
+-	Si deve preparare il file .env in cui inserire le variabili d’ambiente da sfruttare, e va posto nella stessa cartella in cui sono presenti il Dockerfile e docker-compose.yml.
 -	A questo punto si costruiscono le immagini e si fanno partire i container e la rete che li collega tramite il comando ``` docker-compose up```
--	Per chiudere i container si può eseguire ``` docker-compose down```, tramite il quale si rimuovono anche i container e la rete.
+-	Per chiudere i container si può eseguire ``` docker-compose down```, tramite il quale essi vengono anche rimossi, assieme alla rete.
 
-Il file .env, come menzionato sopra, va costruito autonomamente per poterci inserire tutte le variabili d’ambiente necessarie. Queste sono
+Il file .env, come menzionato sopra, va costruito autonomamente per poterci inserire tutte le variabili d’ambiente necessarie. Queste sono:
 -	PORT: la porta interna al container su cui si esporrà il server
 -	HOST: l'host su cui si contatterà il server
--	USER: il nome dell’utente che si connetterà al DB. Verrà creato con la costruzione dell'immagine di mysql. **DEVE** essere diverso da "root".
--	PASSWORD: la password dell’utente sopracitato per accedere al DB.
+-	USER: il nome dell’utente che si connetterà al DB. Verrà creato con la costruzione dell'immagine di mysql. **DEVE** essere diverso da "root"
+-	PASSWORD: la password dell’utente sopracitato per accedere al DB
 -	MYSQL_PORT: la porta interna al container su cui si espone il DB
--	EXTERNAL_PORT: la porta del sistema host su cui si mapperà la porta interna al container per il server
--	EXTERNAL_DB_PORT: la porta del sistema host su cui si mapperà la porta interna al container per il DB
--	SECRET_KEY: chiave usata per la firma del jwt
+-	EXTERNAL_PORT: la porta del sistema host su cui si mapperà la porta interna al container del server
+-	EXTERNAL_DB_PORT: la porta del sistema host su cui si mapperà la porta interna al container del DB
+-	SECRET_KEY: la chiave usata per la firma del JWT
 ## Struttura del codice
 Il codice è suddiviso nei seguenti moduli:
 -	**index** - Questo modulo è quello centrale del progetto. Costruisce il server, definisce le rotte e le callback per gestire le richieste. 
@@ -26,29 +26,29 @@ Il codice è suddiviso nei seguenti moduli:
 -	**Models** - In questa directory troviamo i moduli che contengono le classi con cui si modellano le tabelle del DB
 -	**Middleware** - In questo modulo sono definiti i middleware chiamati prima delle effettive callback di gestione delle richieste. 
 
-Come menzionato, si è implementato il pattern DAO per gestire la comunicazione con il database. In questo modo si sono ben separate le funzionalità di gestione delle richieste (gestite da index e dai middleware), la comunicazione con il DB (gestite dai vari DAO), e la modellazione delle tabelle (tramite le classi che si trovano dentro Models). DAO e modelli sono stati costruiti sfruttando la libreria Sequelize, per cui la loro struttura è un po’ diversa da quella dettata dalla definizione classica delle classi ed interfacce che costituiscono i modelli e i DAO.
+Come menzionato, si è implementato il pattern DAO per gestire la comunicazione con il database. In questo modo si sono ben separate le funzionalità di gestione delle richieste (gestite da index e dai middleware), la comunicazione con il DB (gestite dai vari DAO), e la modellazione delle tabelle (tramite le classi che si trovano dentro Models). DAO e modelli sono stati costruiti sfruttando la libreria Sequelize, per cui la loro struttura è un po’ diversa da quella classica delle classi ed interfacce dei modelli e dei DAO.
 È stato anche implementato il pattern Middleware per eseguire controlli sulle richieste prima di passarli alle callback di gestione. In questo modo si vogliono identificare richieste mal strutturate che arrivano al server prima di passarle alle effettive funzionalità di elaborazione. I controlli da eseguire sulle varie rotte sono di varia tipologia: sono quindi stati costruiti più middleware che vengono chiamati a catena. Questa tipologia di catena è tendenzialmente definita come “catena di responsabilità”. Ogni middleware esegue un controllo, e se tutto va bene passa la staffetta al middleware successivo. Se invece si incontra un errore la catena è interrotta e viene restituito un errore. 
 
 Il seguente diagramma rappresenta i moduli che compongono le applicazioni, le loro funzionalità e come si legano:
 ![](immagini_esempi/module_diagram.png)
 
 ## Funzionamento
-Come accennato in precedenza, il sistema prevede l’utilizzo di un database SQL, gestito con il DBMS MySQL, per la lettura dei dati necessari per svolgere le sue operazioni e per la conservazione delle rilevazioni eseguite (e delle eventuali multe ad esse collegate). All’avvio entrambi i container, rispettivamente uno per il backend e uno per il database, vengono messi in esecuzione e il sistema si mette in attesa delle possibili richieste dei suoi utenti. Si sono dovuti eseguire accorgimenti per assicurarsi che il container del backend parta solo quando il database ha completato la sua inizializzazione. Infatti l'opzione *depends-on* nel file docker-compose.yml non era sufficiente, dato che garantiva esclusivamente che i container partissero nel giusto ordine, ma non forzava quello del backend ad aspettare. Si è deciso quindi di utilizzare uno script bash, *wait-for-it.sh* che mette in attesa il container fino a che non rileva che il DB è pronto. Lo script è stato ottenuto da questo repository: https://github.com/vishnubob/wait-for-it.
+Come accennato in precedenza, il sistema prevede l’utilizzo di un database SQL, gestito con il DBMS MySQL, per la lettura dei dati necessari per svolgere le sue operazioni e per la conservazione delle rilevazioni eseguite (e delle eventuali multe ad esse collegate). All’avvio entrambi i container, rispettivamente uno per il backend e uno per il database, vengono messi in esecuzione e il sistema si mette in attesa delle richieste degli utenti. Si sono dovuti eseguire accorgimenti per assicurarsi che il container del backend partisse solo quando il database ha completato la sua inizializzazione. Infatti l'opzione *depends-on* nel file docker-compose.yml non era sufficiente, dato che garantiva esclusivamente che i container partissero nel giusto ordine, ma non forzava quello del backend ad aspettare fino alla fine dell'inizializzazione dell'altro container. Si è deciso quindi di utilizzare uno script bash, *wait-for-it.sh* che mette in attesa il container del backend fino a che non rileva che l'altro è pronto. Lo script è stato ottenuto da questo repository: https://github.com/vishnubob/wait-for-it.
 
 Le richieste eseguibili sono divise per tipologia di utente: postazione (i terminali fissi responsabili delle rilevazioni su strada), amministratore e automobilista. 
 
 ### Funzioni per postazione
-Alla postazione viene permesso di inviare al sistema i dati relativi ad una rilevazione, ovvero targa del veicolo, in formato JSON o tramite immagine, timestamp e ID della postazione stessa.
+Alla postazione viene permesso di inviare al sistema i dati relativi ad una rilevazione, ovvero: la targa del veicolo, in formato JSON o tramite immagine, il timestamp e l'ID della postazione stessa.
 Il sistema riceve la richiesta e distingue le operazioni da svolgere a seconda del tipo di postazione.  
-Se la postazione è salvata nel database come ‘inizio’ viene creato un oggetto Transito che valorizza parte dei suoi campi con la targa del veicolo (estratta tramite la libreria Tesseract nel caso in cui venga fornita come immagine), il timestamp, che sarà quello di "apertura della tratta", e l’ID relativo alla Tratta a cui appartienela la postazione (ricavabile a partire dalla tabella delle postazioni). 
-Se invece essa è di tipo ‘fine’, si cerca nel database un transito aperto sulla tratta relativa alla postazione che ha mandato la richiesta con la targa rilevata e, in caso di riscontro, esso viene chiuso e aggiornato con il tempo di uscita e la velocità media del veicolo durante il percorso. Nel caso quest’ultima superi il limite di velocità imposto per la tratta corrispondente, viene anche creata una multa con importo variabile a seconda del tipo di infrazione.
+Se la postazione è salvata nel database come ‘inizio’ viene creato un oggetto Transito che valorizza parte dei suoi campi con la targa del veicolo (estratta tramite la libreria Tesseract nel caso in cui venga fornita come immagine), il timestamp, che sarà quello di "apertura della tratta", e l’ID relativo alla tratta a cui appartienela la postazione (ricavabile a partire dalla tabella delle postazioni). 
+Se invece essa è di tipo ‘fine’, si cerca nel database un transito aperto dalla targa rilevata sulla tratta relativa alla postazione che ha mandato la richiesta e, in caso di riscontro, esso viene chiuso e aggiornato con il tempo di uscita e la velocità media del veicolo durante il percorso. Nel caso quest’ultima superi il limite di velocità imposto per la tratta corrispondente, viene anche creata una multa con importo variabile a seconda del tipo di infrazione.
 
 ![](immagini_esempi/UseCase/UseCasePostazione.png)
 
 ### Funzioni per amministratore
 All’amministratore viene permesso di consultare i dati presenti nel sistema e di eseguire semplici analisi. In particolare è possibile richiedere:
 
--	La lista dei veicoli transitati, in un dato intervallo temporale in una data tratta, unita ad una serie di statistiche quali numero transiti, velocità media, minima e massima dei veicoli e la relativa deviazione standard.
+-	La lista dei veicoli transitati in un dato intervallo temporale e in una data tratta, unita ad una serie di statistiche quali numero dei transiti, velocità media, minima e massima dei veicoli e la relativa deviazione standard.
 -	Le stesse statistiche per un singolo veicolo, date una targa e una tratta.
 -	La lista delle tratte con i dettagli relativi alle postazioni che la costituiscono e la distanza tra queste ultime.
 -	La lista delle multe e il loro relativo stato di pagamento, data una targa.
@@ -120,7 +120,7 @@ Postazione di fine tratta con infrazione e relativa generazione di multa:
 |Rotta       | Descrizione|
 |-----------|------------------------|
 |/propriemulte| Viene restituita la lista delle proprie multe con relativo stato di pagamento|
-|/pagamento/:idMulta| Viene cambiato lo stato di pagamento di una multa cambiando il suo attributo “Pagato”|
+|/pagamento/:idMulta| Viene cambiato lo stato di pagamento di una multa, modificando il suo attributo “Pagato”|
 
 #### UML: Diagrammi delle sequenze
 
@@ -143,7 +143,7 @@ Si supporrà inoltre di avere i seguenti transiti e multe già presenti nel DB (
 ![](immagini_esempi/transiti_iniziali.jpg)
 ![](immagini_esempi/multe_iniziali.jpg)
 
-Una nota che vale per tutte le API. A qualunque chiamata è sempre da allegare come parametro un JSON Web Token, JWT in breve. Esso è utilizzato per controllare il ruolo dell'utente (e in alcuni casi anche per altro).
+Una nota che vale per tutte le API. A qualunque chiamata è sempre da allegare come parametro un JSON Web Token, JWT in breve. Esso è utilizzato per controllare il ruolo dell'utente e, nel caso degli automobilisti, anche recuperare le targhe a loro associate.
 I tre ruoli sono: "smartautovelox", "admin" e "car-owner". Utenti di ruolo diverso hanno a disposizione API diverse.
 Il JWT viene firmato tramite l'algoritmo HS256 (HMAC+SHA256). La chiave segreta da utilizzare viene specificata lato backend nel file .env, come descritto nel primo paragrafo. 
 In Postman il JWT è inserito nella sezione “Authorization”:
@@ -155,7 +155,7 @@ Il JWT di un utente con questo ruolo dovrà contenere il campo “Role”, con v
 
 ![](immagini_esempi/jwtautovelox.jpg)
 
- L'utente di tipologia *smartautovelox*, che rappresenta una postazione autovelox,  può eseguire una sola chiamata:
+ L'utente di tipologia *smartautovelox*, che rappresenta una postazione autovelox, può eseguire una sola chiamata:
  
 > Metodo HTTP: **POST**. Rotta: **'/nuovarilevazione/:postazione'**
 
@@ -281,7 +281,7 @@ Eseguita la chiamata, la risposta che il richiedente otterrà sarà di questa fo
 
 
  ### Utente *car-owner*
-Il JWT associato a questo ruolo deve contenere un campo “Ruolo”, con valore “car-owner”. Inoltre serve anche un altro campo, chiamato “Targhe”. Il valore associato può essere una singola stringa contenente la propria targa, oppure un array di stringhe nel caso in cui all’utente siano associate più targhe.
+Il JWT associato a questo ruolo deve contenere un campo “Role”, con valore “car-owner”. Inoltre serve anche un altro campo, chiamato “Targhe”. Il valore associato può essere una singola stringa contenente la propria targa, oppure un array di stringhe nel caso in cui all’utente siano associate più targhe.
 Un esempio di JWT è il seguente:
 
 ![](immagini_esempi/jwtcar.jpg)
@@ -324,9 +324,9 @@ La multa sarà quindi segnalata come pagata nel back-end:
 Gran parte degli errori è gestita semplicemente notificando il richiedente che qualcosa è andato storto o che la richiesta è mal formata.
 L'aggiunta di rilevazioni può però portare ad alcune situazioni di errore che vengono gestite in maniera un poco più complessa, e che quindi vale la pena descrivere più approfonditamente:
 1.  **Targa illeggibile** - Nel caso in cui Tesseract non riesca ad estrarre una targa sensata viene loggato un errore in un file log.txt, in cui si segnala che una certa postazione ha spedito una rilevazione, con un certo timestamp, la cui targa risulta illeggibile. Alla postazione viene ritornata una risposta con status code 400. Non viene creato alcun transito, dato che in assenza della targa le altre informazioni sono inutilizzabili.
-2. **Rilevazione finale in assenza di quella iniziale** - Nel caso in cui venga rilevata un passaggio di un'automobile da una postazione di fine tratta prima che lo faccia una di inizio tratta ci si trova chiaramente in una situazione di errore. È impossibile riuscirne a determinare la causa, e per questo questo errore si gestisce nello stesso identico modo el caso precedente.
+2. **Rilevazione finale in assenza di quella iniziale** - Nel caso in cui venga rilevata un passaggio di un'automobile da una postazione di fine tratta prima che lo faccia una di inizio tratta ci si trova chiaramente in una situazione di errore. È impossibile riuscirne a determinare la causa, e perciò questo errore si gestisce nello stesso identico modo del caso precedente.
 3. **Rilevazione iniziale e finale con lo stesso timestamp** - Nel caso in cui arrivi una nuova rilevazione da una postazione di fine tratta che fornisce lo stesso timestamp che aveva fornito quella di inizio tratta precedentemente ci si trova in una situazione di errore. Anche in questo caso si logga l'errore e si restituisce uno status code 400.
-4. **Transito aperto per troppo tempo** - Se un transito rimane aperto per troppo tempo non ha più senso chiuderlo con la successiva rilevazione di fine tratta. Per questo nell'applicazione è definita un'operazione di pulizia del DB, che cancella transiti aperti da troppo tempo periodicamente. Attualmente l'operazione viene eseguita ogni 100 secondi per motivi di testing, e cancella ogni transito aperto più vecchio di due ore rispetto alla data attuale. Sono comunque valori semplicemente modificabili.
+4. **Transito aperto per troppo tempo** - Se un transito rimane aperto per troppo tempo non ha più senso chiuderlo con la successiva rilevazione di fine tratta. Per questo nell'applicazione è definita un'operazione di pulizia del DB, che cancella periodicamente transiti aperti da troppo tempo. Attualmente l'operazione viene eseguita ogni 100 secondi per motivi di testing, e cancella ogni transito aperto più vecchio di due ore rispetto alla data attuale. Sono comunque valori semplicemente modificabili.
 
 ## Suddivisione del lavoro
 Lavoro comune:

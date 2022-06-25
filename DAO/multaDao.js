@@ -13,7 +13,7 @@ export var MultaDao = {
 //creazione della multa
 async function creaMulta(targa, importo, timestamp) {
   var newMulta = await Multa.create({importo: importo, targa: targa, timestamp:timestamp, pagato: false});
-  return newMulta; //potenzialmente rimovibile
+  return newMulta;
 }
 
 //si ricercano tutte le multe il cui campo "pagato" risulta falso

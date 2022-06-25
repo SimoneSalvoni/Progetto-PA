@@ -7,21 +7,15 @@ export var TransitoDao = {
   ricercaTransitoAperto: ricercaTransitoAperto,
   getTransitiTrattaData: getTransitiTrattaData,
   getTransitiTarga: getTransitiTarga,
-  findById: findById,
-  deleteById: deleteById,
   chiudiTransito: chiudiTransito,
   eliminaTransitiErrati: eliminaTransitiErrati
 }
 //si aggiunge una tupla alla tabella transito su db
 async function aggiungiTransito(targa, tratta, timestampInizio) {
   var newTransito = await Transito.create({ tratta: tratta, aperto: true, targa: targa, timestampInizio: timestampInizio });
-  return newTransito; //potenzialmente rimovibile
+  return newTransito;
 }
 
-//viene restituito uno specifico Transito a partire dal suo id
-function findById(id) {
-  return Transito.findByPk(id);
-}
 
 //viene restituito uno specifico Transito con valore di "aperto" true a partire dalla Tratta percorsa e la Targa del veicolo
 async function ricercaTransitoAperto(targa, tratta) {
@@ -62,11 +56,6 @@ async function getTransitiTarga(tratta, targa) {
   return await Transito.findAll({
     where: { tratta: tratta, targa: targa, aperto:false }
   });
-}
-
-//viene eliminato un transito a partire dal suo id
-function deleteById(id) {
-  return Transito.destroy({ where: { idTransito: id } });
 }
 
 //vengono eliminati tutti i transiti aperti più vecchi di 2 ore
