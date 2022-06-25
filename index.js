@@ -196,13 +196,6 @@ app.post('/nuovarilevazione/:postazione', async (req, res) => {
         return res.status(500).send({ "errore": "Errore interno del server" });
     }
     finally {
-        /*
-        POTREI DOVER FARE COSI' SE NON CANCELLA BENE
-        var tempFile = fs.openSync(filePath, 'r');
-        fs.closeSync(tempFile);
-        fs.unlinkSync(filePath);
-        */
-        //prima però provo async
         try {
             unlink(filePath, () => { });
         } catch (error) {
@@ -221,7 +214,7 @@ app.get('/listaveicoli/:tratta', async (req, res) => {
     let timestampFine = parseInt(req.timestampFine);
     try {
         let data;
-        //I timestamp sono posti a -1 dal middleware se assenti nell'header della richiesta
+        //I timestamp sono posti a -1 dal middleware se entrambi assenti nell'header della richiesta
         if (timestampInizio === -1) data = await TransitoDao.getTransitiTratta(tratta);
         else data = await TransitoDao.getTransitiTrattaData(tratta, timestampInizio, timestampFine);
         let listaTransiti = data.map(x => x.dataValues);
