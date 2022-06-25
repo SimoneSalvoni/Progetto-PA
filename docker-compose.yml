@@ -9,16 +9,16 @@ services:
           - MYSQL_PASSWORD=${PASSWORD}
           - MYSQL_DATABASE=Rilevazioni
           - MYSQL_ALLOW_EMPTY_PASSWORD=yes
-        ports:
-          - ${MYSQL_PORT}:${EXTERNAL_DB_PORT}
+          - MYSQL_TCP_PORT=${MYSQL_PORT}
         volumes: 
           - ./sql/DB.sql:/docker-entrypoint-initdb.d/DB.sql          
     web-node:
         build: .
         ports:
-          - ${PORT}:${EXTERNAL_PORT}
+          - ${EXTERNAL_PORT}:${PORT}
         environment:
           - PORT=${PORT}
+          - EXTERNAL_PORT=${EXTERNAL_PORT}
           - HOST=${HOST}
           - USERNAME=${USER}
           - PASSWORD=${PASSWORD}

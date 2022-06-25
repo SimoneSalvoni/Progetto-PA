@@ -16,8 +16,9 @@ Il file .env, come menzionato sopra, va costruito autonomamente per poterci inse
 -	PASSWORD: la password dell’utente sopracitato per accedere al DB
 -	MYSQL_PORT: la porta interna al container su cui si espone il DB
 -	EXTERNAL_PORT: la porta del sistema host su cui si mapperà la porta interna al container del server
--	EXTERNAL_DB_PORT: la porta del sistema host su cui si mapperà la porta interna al container del DB
 -	SECRET_KEY: la chiave usata per la firma del JWT
+
+**NOTA** Alla fine dell'inizializzazione del container del web server comparirà un messaggio del tipo "server in ascolto su: http://0.0.0.0:3000". La porta che viene specificata nel messaggio **NON** è la porta interna al container, ovvero quella specificata dalla variabile d'ambiente PORT. È invece la variabile del sistema host, quella specificata dalla variabile d'ambiente EXTERNAL_PORT. Questo è fatto per rendere più semplice capire a qualche porta bisogna connettersi. Ovviamente questo non è un problema nel caso in cui si decida di sfruttare la stessa porta sia nel container sia nell'host.
 ## Struttura del codice
 Il codice è suddiviso nei seguenti moduli:
 -	**index** - Questo modulo è quello centrale del progetto. Costruisce il server, definisce le rotte e le callback per gestire le richieste. 

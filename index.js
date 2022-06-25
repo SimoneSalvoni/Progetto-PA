@@ -28,7 +28,8 @@ await createTmpLog();
 let app = express();
 app.use(fileUpload());
 
-const PORT = process.env.PORT || 3000;
+const EXTERNAL_PORT = process.env.EXTERNAL_PORT || 3000
+const PORT = process.env.EXTERNAL_PORT || 3000;
 const HOST = process.env.HOST || '0.0.0.0';
 
 //Viene fatta una prima chiamata al DB, con cui si prendono postazioni e tratte. Dato che il numero sarà verosimilmente sempre 
@@ -404,6 +405,6 @@ setInterval(() => {
 
 
 app.listen(PORT, HOST, err => {
-    if (err) return console.log(`Impossibile ascoltare sull host ${HOST} nella porta: ${PORT}`);
-    console.log(`server in ascolto su: http://${HOST}:${PORT}/`);
+    if (err) return console.log(`Impossibile ascoltare sull host ${HOST} nella porta: ${EXTERNAL_PORT}`);
+    console.log(`server in ascolto su: http://${HOST}:${EXTERNAL_PORT}/`);
 });
