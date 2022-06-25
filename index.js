@@ -29,7 +29,7 @@ let app = express();
 app.use(fileUpload());
 
 const EXTERNAL_PORT = process.env.EXTERNAL_PORT || 3000
-const PORT = process.env.EXTERNAL_PORT || 3000;
+const PORT = process.env.PORT || 3000;
 const HOST = process.env.HOST || '0.0.0.0';
 
 //Viene fatta una prima chiamata al DB, con cui si prendono postazioni e tratte. Dato che il numero sarà verosimilmente sempre 
